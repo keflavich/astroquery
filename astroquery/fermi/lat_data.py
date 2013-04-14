@@ -1,9 +1,16 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+"""Download of Fermi LAT (Large Area Telescope) data"""
 import requests
 import urllib
 import re
 import time
 
+__all__ = ['FermiLAT_Query', 'FermiLAT_DelayedQuery']
+
 class FermiLAT_Query(object):
+    """
+    TODO: document
+    """
 
     request_url = 'http://fermi.gsfc.nasa.gov/cgi-bin/ssc/LAT/LATDataQuery.cgi'
     result_url_re = re.compile('The results of your query may be found at <a href="(http://fermi.gsfc.nasa.gov/.*?)"')
@@ -47,8 +54,7 @@ class FermiLAT_Query(object):
                    'spacecraft':'on' if spacecraftdata else 'off'}
 
         result = requests.post(self.request_url, data=payload)
-
-        re_result = self.result_url_re.findall(result)
+        re_result = self.result_url_re.findall(result._content)
 
         if len(re_result) == 0:
             raise ValueError("Results did not contain a result url... something went awry (that hasn't been tested yet)")
@@ -58,6 +64,9 @@ class FermiLAT_Query(object):
         return result_url
 
 class FermiLAT_DelayedQuery(object):
+    """
+    TODO: document
+    """
 
     fitsfile_re = re.compile('<a href="(.*?)">Available</a>')
 
@@ -84,7 +93,7 @@ class FermiLAT_DelayedQuery(object):
         return fitsfile_urls
 
     def _check_page(self):
-        result_page = urllib.urlopen(result_url)
+        result_page = urllib.urlopen(self.result_url)
 
         pagedata = result_page.read()
 
