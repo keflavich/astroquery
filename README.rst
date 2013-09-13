@@ -91,3 +91,9 @@ List of Modules
 .. _View on Github: https://github.com/astropy/astroquery/
 .. _docs: http://astroquery.readthedocs.org
 .. _Documentation: http://astroquery.readthedocs.org
+
+
+.. image:: https://d2weczhvl823v0.cloudfront.net/keflavich/astroquery/trend.png
+   :alt: Bitdeli badge
+   :target: https://bitdeli.com/free
+
