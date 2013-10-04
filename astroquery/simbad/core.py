@@ -60,7 +60,7 @@ def validate_equinox(func):
         return func(*args, **kwargs)
     return wrapper
 
-    
+
 def strip_field(f):
     """Helper tool: remove parameters from VOTABLE fields"""
     if '(' in f:
@@ -177,7 +177,7 @@ class Simbad(BaseQuery):
         list of field_names
         """
         dict_file = get_pkg_data_filename(os.path.join('data', 'votable_fields_dict.json'))
-            
+
         with open(dict_file, "r") as f:
             fields_dict = json.load(f)
             fields_dict = dict(
@@ -237,11 +237,11 @@ class Simbad(BaseQuery):
     @class_or_instance
     def query_criteria(self, *args, **kwargs):
         """
-        Query SIMBAD based on any criteria.  
+        Query SIMBAD based on any criteria.
 
         Parameters
         ----------
-        args: 
+        args:
             String arguments passed directly to SIMBAD's script
             (e.g., 'region(box, GAL, 10.5 -10.5, 0.5d 0.5d)')
         kwargs:
@@ -260,11 +260,11 @@ class Simbad(BaseQuery):
     @class_or_instance
     def query_criteria_async(self, *args, **kwargs):
         """
-        Query SIMBAD based on any criteria.  
+        Query SIMBAD based on any criteria.
 
         Parameters
         ----------
-        args: 
+        args:
             String arguments passed directly to SIMBAD's script
             (e.g., 'region(box, GAL, 10.5 -10.5, 0.5d 0.5d)')
         kwargs:
@@ -290,8 +290,8 @@ class Simbad(BaseQuery):
 
         Parameters
         ----------
-        object_name : str
-            name of object to be queried
+        object_name : str or list of str
+            name of object to be queried, or a list of object names
         wildcard : boolean, optional
             When it is set to `True` it implies that the object is specified
             with wildcards. Defaults to `False`.
@@ -312,8 +312,8 @@ class Simbad(BaseQuery):
 
         Parameters
         ----------
-        object_name : str
-            name of object to be queried
+        object_name : str or list of str
+            name of object to be queried, or a list of object names
         wildcard : boolean, optional
             When it is set to `True` it implies that the object is specified
             with wildcards. Defaults to `False`.
@@ -323,6 +323,11 @@ class Simbad(BaseQuery):
         response : `requests.response`
             the response of the query from the server
         """
+        from astropy.utils import isiterable
+        if isiterable(object_name) and not isinstance(object_name, basestring):
+            #SIMBAD accepts newline-sperated object names as a query
+            object_name = '\n'.join(object_name)
+
         request_payload = self._args_to_payload(object_name, wildcard=wildcard,
                                                 caller='query_object_async')
         response = commons.send_request(self.SIMBAD_URL, request_payload,
@@ -582,7 +587,7 @@ class Simbad(BaseQuery):
             for k in kwargs:
                 present_keys.append(k)
             # need ampersands to join args
-            args_str = '&'.join([str(val) for val in args]) 
+            args_str = '&'.join([str(val) for val in args])
             args_str += " & " if len(args) > 0 else ""
         else:
             args_str = ' '.join([str(val) for val in args])
