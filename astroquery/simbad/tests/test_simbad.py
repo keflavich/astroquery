@@ -120,8 +120,8 @@ def test_parse_result():
         dummy = simbad.core.Simbad._parse_result(MockResponseSimbad('query error '))
     assert ex.value.message == ('Failed to parse SIMBAD result! '
                                 'The raw response can be found in self.response, '
-                                'and the error in self.table_parse_error.  '
-                                'The attempted parsed result is in self.parsed_result.'
+                                'and the error in self.last_table_parse_error.  '
+                                'The attempted parsed result is in self.last_parsed_result.'
                                 '\nException: 7:115: no element found')
     assert isinstance(simbad.core.Simbad.response.content, basestring)
 
