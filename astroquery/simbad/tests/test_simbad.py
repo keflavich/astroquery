@@ -22,6 +22,7 @@ FK5_COORDS = coord.FK5Coordinates(ra=83.82207, dec=-80.86667, unit=(u.deg, u.deg
 
 DATA_FILES = {
     'id': 'query_id.data',
+    'ids': 'query_ids.data',
     'coo': 'query_coo.data',
     'cat': 'query_cat.data',
     'bibobj': 'query_bibobj.data',
@@ -50,8 +51,8 @@ class MockResponseSimbad(MockResponse):
 
 
 def data_path(filename):
-        data_dir = os.path.join(os.path.dirname(__file__), 'data')
-        return os.path.join(data_dir, filename)
+    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    return os.path.join(data_dir, filename)
 
 
 @pytest.fixture
@@ -260,12 +261,21 @@ def test_query_object_async(patch_post, object_name, wildcard):
                           ])
 def test_query_object(patch_post, object_name, wildcard):
     result1 = simbad.core.Simbad.query_object(object_name,
-                                             wildcard=wildcard)
+                                              wildcard=wildcard)
     result2 = simbad.core.Simbad().query_object(object_name,
-                                wildcard=wildcard)
+                                                wildcard=wildcard)
     assert isinstance(result1, Table)
     assert isinstance(result2, Table)
 
+@pytest.mark.parametrize(('object_names', 'wildcard'),
+                         [(["m1","m2"], None), ])
+def test_query_objects(patch_post, object_names, wildcard):
+    result1 = simbad.core.Simbad.query_objects(object_names,
+                                               wildcard=wildcard)
+    result2 = simbad.core.Simbad().query_objects(object_names,
+                                                 wildcard=wildcard)
+    assert isinstance(result1, Table)
+    assert isinstance(result2, Table)
 
 def test_list_votable_fields():
     simbad.core.Simbad.list_votable_fields()

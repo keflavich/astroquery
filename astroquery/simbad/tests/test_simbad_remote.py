@@ -78,8 +78,16 @@ class TestSimbad(object):
                                                         wildcard=True)
         assert response is not None
 
+    def test_query_objects_async(self):
+        response = simbad.core.Simbad.query_object_async(["m 1","m 2"])
+        assert response is not None
+
     def test_query_object(self):
         result = simbad.core.Simbad.query_object("m [0-9]", wildcard=True)
+        assert isinstance(result, Table)
+
+    def test_query_object(self):
+        result = simbad.core.Simbad.query_object(['m 1','m 2'])
         assert isinstance(result, Table)
 
     def test_query_multi_object(self):
