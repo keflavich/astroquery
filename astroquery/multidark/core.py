@@ -12,9 +12,13 @@ import astropy.coordinates as coord
 import astropy.io.votable as votable
 from astropy.io import fits
 import astropy.utils.data as aud
+import tempfile
+import warnings
 
 from ..query import QueryWithLogin
 from . import MULTIDARK_SERVER, MULTIDARK_TIMEOUT
+from ..utils import commons
+from ...exceptions import TableParseError
 
 __all__ = ['MultiDark']
 
@@ -68,7 +72,7 @@ class MultiDark(QueryWithLogin):
         """
         Determine whether currently logged in.
         """
-        if self.session == None:
+        if self.session is None:
             return False
         for cookie in self.session.cookies:
             if cookie.is_expired():
@@ -80,7 +84,7 @@ class MultiDark(QueryWithLogin):
             
 
     
-    def _multidark_send_request(self, url, request_payload) :
+    def _multidark_send_request(self, url, request_payload):
         """
         Helper function that sends the query request via a session or simple HTTP
         GET request.
@@ -104,7 +108,7 @@ class MultiDark(QueryWithLogin):
         return response
 
 
-     def _parse_result(self, response, verbose=False):
+    def _parse_result(self, response, verbose=False):
         """
         Parses the raw HTTP response and returns it as an `astropy.table.Table`.
 
@@ -145,4 +149,3 @@ class MultiDark(QueryWithLogin):
             self.table_parse_error = ex
             raise TableParseError("Failed to parse UKIDSS votable! The raw response can be found "
                                   "in self.response, and the error in self.table_parse_error.")
-
