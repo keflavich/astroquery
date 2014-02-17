@@ -137,7 +137,7 @@ def _parse_datafile(datafile, query_type, coll_partner_index=0):
     # np.in1d does not work in np < 1.7
     sections = np.argwhere([query_identifier in line for line in datafile])
     if len(sections) == 0:
-        raise Exception('Query data not found in file.')
+        raise ValueError('Query data not found in file.')
     start_index = sections[i][0]
     # Select rows and columns from the raw datafile list
     data, col_names = _select_data(datafile, start_index,
