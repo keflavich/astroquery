@@ -26,8 +26,8 @@ def async_to_sync(cls):
                 verbose = kwargs.pop('verbose')
             else:
                 verbose = False
-            response = getattr(self,async_method_name)(*args,**kwargs)
-            result = self._parse_result(response, verbose=verbose)
+            self.response = getattr(self,async_method_name)(*args,**kwargs)
+            result = self._parse_result(self.response, verbose=verbose)
             self.table = result
             return result
 
