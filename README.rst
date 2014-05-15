@@ -23,20 +23,12 @@ Installation and Requirements
 -----------------------------
 
 
-As an `astropy`_ affiliate, astroquery requires `astropy`_.  However, because
-astroquery relies heavily upon the ``astropy.coordinates`` module, the
-development version of `astropy`_ is required. `astropy`_ can be installed from
-pip:
-
-.. code-block:: bash
-
-    $ pip install git+http://github.com/astropy/astropy.git#egg=astropy
-
-astroquery uses the `requests <http://docs.python-requests.org/en/latest/>`_
+Astroquery requires `astropy`_ version 0.4 or later.
+Astroquery uses the `requests <http://docs.python-requests.org/en/latest/>`_
 module to communicate with the internet.  `requests`_ can also be installed with
-pip.
+pip.  The BeautifulSoup_ and lxml_ modules are required for some functionality
 
-The `first beta release`_ of astroquery can be downloaded or pip installed:
+The `latest release`_ of astroquery can be downloaded or pip installed:
 
 .. code-block:: bash
 
@@ -47,7 +39,7 @@ Or if pypi is down:
    
 .. code-block:: bash
    
-   $ pip install https://github.com/astropy/astroquery/archive/v0.1.tar.gz
+   $ pip install https://github.com/astropy/astroquery/archive/v0.2.tar.gz
 
 
 If you'd like the latest development version, you can install it with the
@@ -121,9 +113,9 @@ To cite, use our `figshare`_ DOI (http://dx.doi.org/10.6084/m9.figshare.805208).
 .. _View on Github: https://github.com/astropy/astroquery/
 .. _docs: http://astroquery.readthedocs.org
 .. _Documentation: http://astroquery.readthedocs.org
-.. _first beta release: https://github.com/astropy/astroquery/tarball/v0.1
+.. _latest release: https://github.com/astropy/astroquery/tarball/v0.2
 .. _astropy.astroquery@gmail.com: mailto:astropy.astroquery@gmail.com
 .. _Adam Ginsburg: http://www.adamgginsburg.com
 .. _Blog: http://astropy.org/astroquery-blog
 .. _API: http://astroquery.readthedocs.org/en/latest/api.html
-.. _figshare: http://figshare.com/articles/Astroquery_v0_1/805208
+.. _figshare: http://figshare.com/articles/Astroquery_v0_ ##### REPLACE THIS ######
