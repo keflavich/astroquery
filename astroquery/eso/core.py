@@ -537,5 +537,11 @@ class EsoClass(QueryWithLogin):
 
         return 'No data returned' not in response.content
 
+    def get_apex_data(self, dataset):
+        """
+        http://archive.eso.org/wdb/wdb/eso/apex_product/query?dp_id=E-085.B-0964A
+        """
+        raise NotImplementedError()
+
 
 Eso = EsoClass()
