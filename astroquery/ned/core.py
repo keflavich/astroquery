@@ -515,7 +515,9 @@ class NedClass(BaseQuery):
         object_name : str
             name of the identifier to query.
         table : str, optional
-            Must be one of ['photometry'|'positions'|'diameters'|'redshifts'|'references'|'object_notes'].
+            Must be one of ['photometry', 'positions', 'diameters',
+            'redshifts', 'references', 'object_notes', 'external_links',
+            'derived_values', 'names', 'basic'].
             Specifies the type of data-table that must be fetched for the given object. Defaults to
             'photometry'.
         from_year : int, [optional for references]
@@ -534,15 +536,23 @@ class NedClass(BaseQuery):
         response : `requests.Response`
             The HTTP response returned from the service.
         """
-        SEARCH_TYPE = dict(photometry='Photometry',
-                           diameters='Diameters',
-                           positions='Positions',
-                           redshifts='Redshifts',
-                           references='Reference',
-                           object_notes='Notes')
-        request_payload = dict(of='xml_main')
+        SEARCH_TYPE = dict(photometry=(Ned.DATA_SEARCH_URL, 'main','Photometry'),
+                           diameters=(Ned.DATA_SEARCH_URL, 'main','Diameters'),
+                           positions=(Ned.DATA_SEARCH_URL, 'main','Positions'),
+                           redshifts=(Ned.DATA_SEARCH_URL, 'main','Redshifts'),
+                           references=(Ned.DATA_SEARCH_URL, 'main','Reference'),
+                           object_notes=(Ned.DATA_SEARCH_URL, 'main','Notes'),
+                           basic=(Ned.OBJ_SEARCH_URL,'basic',None),
+                           #positions=(Ned.OBJ_SEARCH_URL,'posn',None),
+                           names=(Ned.OBJ_SEARCH_URL,'names',None),
+                           derived_values=(Ned.OBJ_SEARCH_URL,'derved',None),
+                           external_links=(Ned.OBJ_SEARCH_URL,'extern',None),
+                          )
+        url,xmltable,search_type = SEARCH_TYPE[table]
+        request_payload = dict(of='xml_'+xmltable)
         request_payload['objname'] = object_name
-        request_payload['search_type'] = SEARCH_TYPE[table]
+        request_payload['img_stamp'] = 'NO'
+        #request_payload['search_type'] = search_type
         if table == 'photometry':
             output_table_format = 1
             request_payload['meas_type'] = Ned.PHOTOMETRY_OUT[output_table_format].cgi_name
@@ -552,7 +562,7 @@ class NedClass(BaseQuery):
             request_payload['end_year'] = kwargs.get('to_year', datetime.now().year)
         if get_query_payload:
             return request_payload
-        response = commons.send_request(Ned.DATA_SEARCH_URL, request_payload, Ned.TIMEOUT, request_type='GET')
+        response = commons.send_request(url, request_payload, Ned.TIMEOUT, request_type='GET')
         return response
 
     def _request_payload_init(self):
