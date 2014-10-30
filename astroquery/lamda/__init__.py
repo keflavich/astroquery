@@ -16,6 +16,3 @@ Note:
   data are encouraged.
 """
 from .core import *
-
-import warnings
-warnings.warn("Experimental: LAMDA has not yet been refactored to have its API match the rest of astroquery.")
