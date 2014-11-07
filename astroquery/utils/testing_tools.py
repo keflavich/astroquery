@@ -2,6 +2,8 @@
 from __future__ import print_function
 import socket
 import requests
+import tempfile
+import webbrowser
 
 from astropy.tests.helper import pytest
 
@@ -54,3 +56,10 @@ class MockResponse(object):
     @property
     def text(self):
         return self.content.decode(errors='replace')
+
+def view_in_browser(html):
+    tf = tempfile.NamedTemporaryFile(delete=False)
+    with open(tf.name, 'w') as f:
+        f.write(html)
+    webbrowser.open('file://'+tf.name)
+
