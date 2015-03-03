@@ -369,9 +369,14 @@ class IrsaClass(BaseQuery):
 
         return table
 
-    def list_catalogs(self):
+    def list_catalogs(self, cache=True):
         """
         Return a dictionary of the catalogs in the IRSA Gator tool.
+
+        Parameters
+        ----------
+        cache : bool
+            Cache the result?
 
         Returns
         -------
@@ -380,7 +385,9 @@ class IrsaClass(BaseQuery):
             be used in query functions, and the value is the verbose description
             of the catalog.
         """
-        response = commons.send_request(Irsa.GATOR_LIST_URL, dict(mode='xml'), Irsa.TIMEOUT, request_type="GET")
+        response = self._request('GET', Irsa.GATOR_LIST_URL,
+                                 data=dict(mode='xml'), timeout=Irsa.TIMEOUT,
+                                 cache=cache)
         root = tree.fromstring(response.content)
         catalogs = {}
         for catalog in root.findall('catalog'):
