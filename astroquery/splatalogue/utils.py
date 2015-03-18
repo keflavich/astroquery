@@ -5,9 +5,23 @@ Utilities for working with Splatalogue query results
 import numpy as np
 import astropy
 
-column_headings_map = {'Log<sub>10</sub> (A<sub>ij</sub>)': 'log10(Aij)',
+# Mappings to allow .ipac writing
+column_headings_map = {
+                       'Log<sub>10</sub> (A<sub>ij</sub>)': 'log10_Aij',
                        'E_U (K)': 'EU_K',
-                       'Resolved QNs': 'QNs'}
+                       'Resolved QNs': 'QNs',
+                       'Chemical Name': 'Chemical_Name',
+                       'Freq-GHz':'Freq_GHz',
+                       'Freq Err':'Freq_Err',
+                       'Meas Freq-GHz':'Meas_Freq_GHz',
+                       'Meas Freq Err':'Meas_Freq_Err',
+                       'CDMS/JPL Intensity':'CDMS_JPL_Intensity',
+                       'S<sub>ij</sub>':'S_ij',
+                       'Lovas/AST Intensity':'Lovas_AST_Intensity',
+                       'E_L (cm^-1)':'EL_cm',
+                       'E_L (K)':    'EL_K',
+                       'E_U (cm^-1)':'EU_cm',
+                      }
 
 
 def clean_column_headings(table, renaming_dict=column_headings_map):
