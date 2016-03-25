@@ -39,7 +39,7 @@ matrix:
         - python: 3.5
           env: SETUP_CMD='egg_info'
         - python: 3.5
-          env: SETUP_CMD='test'
+          env: SETUP_CMD='test -R'
                CONDA_DEPENDENCIES='requests matplotlib html5lib'
                PIP_DEPENDENCIES='keyring aplpy pyregion beautifulsoup4'
 
