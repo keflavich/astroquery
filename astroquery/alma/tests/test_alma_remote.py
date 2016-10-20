@@ -113,8 +113,10 @@ class TestAlma:
         #assert set(m83_data.colnames) == set(all_colnames)
         galactic_center = coordinates.SkyCoord(0 * u.deg, 0 * u.deg,
                                                frame='galactic')
-        gc_data = alma.query_region(galactic_center, 1 * u.deg)
-        assert len(gc_data) >= 425 # Feb 8, 2016
+        gc_data = alma.query_region(galactic_center, 1 * u.deg,
+                                    public=False,
+                                    science=False)
+        assert len(gc_data) >= 155 # 425 on Feb 8, 2016, 155 on Oct 17 2016
 
         uids = np.unique(m83_data['Asdm uid'])
         assert b'uid://A002/X3b3400/X90f' in uids
