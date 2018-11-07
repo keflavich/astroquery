@@ -28,6 +28,7 @@
 - MAST: Fixing mrp_only but and changing default to False [#1238]
 - SPLATALOGUE: Minor - utils & tests updated to match upstream change [#1236]
 - FERMI: Switch to HTTPS [#1241]
+- MAST: Add functionality for switching to auth.mast when it goes live [#1256]
 
 0.3.8 (2018-04-27)
 ------------------
