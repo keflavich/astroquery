@@ -55,6 +55,7 @@ def patch_post(request):
     mp.setattr(mast.Catalogs, '_download_file', download_mockreturn)
     mp.setattr(mast.Mast, 'session_info', session_info_mockreturn)
     mp.setattr(mast.Observations, 'session_info', session_info_mockreturn)
+    mp.setattr(mast.Observations, '_get_auth_mode', _get_auth_mode_mockreturn)
     return mp
 
 
@@ -99,6 +100,9 @@ def session_info_mockreturn(silent=False):
                    'Username': 'anonymous'}
 
     return anonSession
+
+def _get_auth_mode_mockreturn(self):
+    return "SHIB-ECP"
 
 
 ###################
