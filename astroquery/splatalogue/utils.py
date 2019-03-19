@@ -55,11 +55,11 @@ def merge_frequencies(table, prefer='measured',
     """
 
     if prefer == 'measured':
-        Freq = np.copy(table[theor_kwd])
+        Freq = np.copy(table[theor_kwd]).astype('float64')
         measmask = np.logical_not(table[meas_kwd].mask)
         Freq[measmask] = table[meas_kwd][measmask]
     elif prefer == 'theoretical':
-        Freq = np.copy(table[meas_kwd])
+        Freq = np.copy(table[meas_kwd]).astype('float64')
         theomask = np.logical_not(table[theor_kwd].mask)
         Freq[measmask] = table[theor_kwd][theomask]
     else:
@@ -67,7 +67,7 @@ def merge_frequencies(table, prefer='measured',
 
     index = table.index_column(theor_kwd)
     table.remove_columns([theor_kwd, meas_kwd])
-    newcol = astropy.table.Column(name='Freq', data=Freq)
+    newcol = astropy.table.Column(name='Freq', data=Freq, dtype='float64')
     table.add_column(newcol, index=index)
 
     return table
