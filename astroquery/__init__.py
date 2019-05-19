@@ -34,7 +34,7 @@ __citation__ = __bibtex__ = _get_bibtex()
 # categories of data type
 from atomic_molecular_databases import atomic, hitran, jplspec, nist, splatalogue, vamdc
 from simulations import besancon, cosmosim
-from observatory_archives import alma, nrao, gaia, fermi
+from observatory_archives import alma, fermi, gaia, lcogt, nrao
 from image_cutout_services import skyview, magpis
 
 # institutes with multiple submodules
@@ -44,8 +44,9 @@ from ipac import ibe, irsa, irsa_dust, sha, ned
 from esa import esasky, gaia, hubble
 # from mast import
 # from heasarc import
+# from cadc import
 
 from exoplanets import open_exoplanet_catalogue, exoplanet_orbit_database, nasa_exoplanet_archive
 from solarsystem import jplsbdb, jplhorizons, mpc
 
-from surveys import nvas, gama, ogle, sdss
+from surveys import alfalfa, nvas, gama, ogle, sdss
