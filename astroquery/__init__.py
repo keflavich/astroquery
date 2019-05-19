@@ -28,8 +28,24 @@ def _get_bibtex():
 
 __citation__ = __bibtex__ = _get_bibtex()
 
-from wfau import vsa, ukidss
-from atomic_molecular_databases import hitran, splatalogue, jplspec, nist, atomic
+# backward compatibility: retain the flat namespace as of May 2019 at least
+# until we deprecate it
+
+# categories of data type
+from atomic_molecular_databases import atomic, hitran, jplspec, nist, splatalogue, vamdc
 from simulations import besancon, cosmosim
 from observatory_archives import alma, nrao, gaia, fermi
-from cds import simbad, vizier
+from image_cutout_services import skyview, magpis
+
+# institutes with multiple submodules
+from wfau import vsa, ukidss
+from cds import simbad, vizier, xmatch
+from ipac import ibe, irsa, irsa_dust, sha, ned
+from esa import esasky, gaia, hubble
+# from mast import
+# from heasarc import
+
+from exoplanets import open_exoplanet_catalogue, exoplanet_orbit_database, nasa_exoplanet_archive
+from solarsystem import jplsbdb, jplhorizons, mpc
+
+from surveys import nvas, gama, ogle, sdss
