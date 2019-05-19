@@ -27,3 +27,9 @@ def _get_bibtex():
 
 
 __citation__ = __bibtex__ = _get_bibtex()
+
+from wfau import vsa, ukidss
+from atomic_molecular_databases import hitran, splatalogue, jplspec, nist, atomic
+from simulations import besancon, cosmosim
+from observatory_archives import alma, nrao, gaia, fermi
+from cds import simbad, vizier
