@@ -95,7 +95,7 @@ matrix:
         - os: linux
           stage: Tests with other Python/Numpy versions
           env: PYTHON_VERSION=3.6 NUMPY_VERSION=1.14 KEYRING_VERSION='<12.0'
-               ASTROPY_VERSION=3.0 APLPY_VERSION='<2.0'
+               ASTROPY_VERSION=3.0 APLPY_VERSION='<2.0' DEBUG=True
 
         - os: linux
           stage: Tests with other Python/Numpy versions
@@ -144,10 +144,12 @@ matrix:
                SETUP_CMD='test -R -V -a "--durations=50"'
                CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES_REMOTE
 
-
 install:
     - git clone git://github.com/astropy/ci-helpers.git
     - source ci-helpers/travis/setup_conda.sh
+
+    # https://github.com/travis-ci/travis-ci/issues/8982#issuecomment-354357640
+    - if [ $TRAVIS_OS_NAME != windows ]; then python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"; fi
 
 script:
    - $RUN_HTTPBIN

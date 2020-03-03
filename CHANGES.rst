@@ -8,9 +8,32 @@ New Tools and Services
 Service fixes and enhancements
 ------------------------------
 
+gaia
+^^^^
+
+- Allow for setting row limits in query submissions through class
+  attribute. [#1641]
+
+jplhorizons
+^^^^^^^^^^^
+
+- Fix for changes in HORIZONS return results after their 2020 Feb 12
+  update. [#1650]
+
+alma
+^^^^
+
+- A new API was deployed in late February / early March 2020, requiring a
+  refactor.  The user-facing API should remain mostly the same, but some
+  service interruption may have occurred.  Note that the ``stage_data`` column
+  ``uid`` has been renamed ``mous_uid``, which is a technical correction, and
+  several columns have been added [#1644]
+
 
 Infrastructure, Utility and Other Changes and Additions
 -------------------------------------------------------
+
+
 
 
 0.4 (2020-01-24)
