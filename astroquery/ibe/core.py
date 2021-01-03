@@ -121,13 +121,13 @@ class IbeClass(BaseQuery):
             coordinate=coordinate, mission=mission,
             dataset=dataset, table=table, width=width,
             height=height, intersect=intersect, most_centered=most_centered,
-            action='sia')
+            action='SIA')
 
         # Raise exception, if request failed
         response.raise_for_status()
 
         return commons.parse_votable(
-            response.text).get_first_table().to_table()
+            response.content).get_first_table().to_table()
 
     def query_region_async(
             self, coordinate=None, where=None, mission=None, dataset=None,
@@ -213,7 +213,8 @@ class IbeClass(BaseQuery):
                 "Invalid value for `intersects` " +
                 "(must be 'COVERS', 'ENCLOSED', 'CENTER', or 'OVERLAPS')")
 
-        if action not in ('sia', 'data', 'search'):
+        action = action.upper()
+        if action.lower() not in ('sia', 'data', 'search'):
             raise InvalidQueryError("Valid actions are: sia, data, search.")
         if action == 'data':
             raise NotImplementedError(
@@ -254,7 +255,7 @@ class IbeClass(BaseQuery):
                 dataset=dataset or self.DATASET,
                 table=table or self.TABLE)
 
-        return self._request('GET', url, args, timeout=self.TIMEOUT)
+        return self._request('GET', url=url, data=args, timeout=self.TIMEOUT)
 
     def list_missions(self, cache=True):
         """
@@ -270,15 +271,14 @@ class IbeClass(BaseQuery):
             # unnecessarily
             missions = self._missions
         else:
-            url = self.URL + "search/"
+            url = self.URL + "ibe/search/"
             response = self._request('GET', url, timeout=self.TIMEOUT,
                                      cache=cache)
 
-            root = BeautifulSoup(response.text)
+            root = BeautifulSoup(response.text, 'html5')
             links = root.findAll('a')
-
-            missions = [os.path.basename(a.attrs['href'].rstrip('/'))
-                            for a in links]
+            splitattrs = [a.attrs['href'].split("/") for a in links]
+            missions = [entry[entry.index('search')+1] for entry in splitattrs]
             self._missions = missions
 
         return missions
@@ -308,14 +308,14 @@ class IbeClass(BaseQuery):
                              "Must be one of: {1}"
                              .format(mission, self.list_missions()))
 
-        url = "{URL}search/{mission}/".format(URL=self.URL, mission=mission)
+        url = "{URL}ibe/search/{mission}/".format(URL=self.URL, mission=mission)
         response = self._request('GET', url, timeout=self.TIMEOUT,
                                  cache=cache)
 
-        root = BeautifulSoup(response.text)
+        root = BeautifulSoup(response.text, 'html5')
         links = root.findAll('a')
         datasets = [a.text for a in links
-                    if a.attrs['href'].count('/') >= 4  # shown as '..'; ignore
+                    if a.attrs['href'].count('/') >= 3  # shown as '..'; ignore
                     ]
 
         return datasets
@@ -360,13 +360,13 @@ class IbeClass(BaseQuery):
                              .format(dataset, mission,
                                      self.list_datasets(mission, cache=True)))
 
-        url = "{URL}search/{mission}/{dataset}/".format(URL=self.URL,
+        url = "{URL}ibe/search/{mission}/{dataset}/".format(URL=self.URL,
                                                         mission=mission,
                                                         dataset=dataset)
         response = self._request('GET', url, timeout=self.TIMEOUT,
                                  cache=cache)
 
-        root = BeautifulSoup(response.text)
+        root = BeautifulSoup(response.text, 'html5')
         return [tr.find('td').string for tr in root.findAll('tr')[1:]]
 
     # Unfortunately, the URL construction for each data set is different, and
@@ -388,7 +388,7 @@ class IbeClass(BaseQuery):
             The table to be queried (if not the default table).
         """
 
-        url = "{URL}docs/{mission}/{dataset}/{table}".format(
+        url = "{URL}ibe/docs/{mission}/{dataset}/{table}".format(
                 URL=self.URL,
                 mission=mission or self.MISSION,
                 dataset=dataset or self.DATASET,

@@ -15,7 +15,7 @@ class Conf(_config.ConfigNamespace):
     """
 
     server = _config.ConfigItem(
-        'http://irsa.ipac.caltech.edu/ibe/',
+        'http://irsa.ipac.caltech.edu/',
         'Name of the IBE server to use.')
     mission = _config.ConfigItem(
         'ptf',
