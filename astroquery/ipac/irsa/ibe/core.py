@@ -227,11 +227,11 @@ class IbeClass(BaseQuery):
         if coordinate is not None:
             c = commons.parse_coordinates(coordinate).transform_to(coord.ICRS)
             args['POS'] = '{0},{1}'.format(c.ra.deg, c.dec.deg)
-            if width and height:
+            if width is not None and height is not None:
                 args['SIZE'] = '{0},{1}'.format(
                     coord.Angle(width).value,
                     coord.Angle(height).value)
-            elif width or height:
+            elif width is not None or height is not None:
                 args['SIZE'] = str(coord.Angle(width or height).value)
 
         if where:
