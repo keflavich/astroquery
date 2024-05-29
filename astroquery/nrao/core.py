@@ -33,6 +33,9 @@ from ..utils.process_asyncs import async_to_sync
 from ..query import BaseQuery, QueryWithLogin, BaseVOQuery
 from . import conf, auth_urls, tap_urls
 from astroquery.exceptions import CorruptDataWarning
+from ..alma.tapsql import (_gen_pos_sql, _gen_str_sql, _gen_numeric_sql,
+                     _gen_band_list_sql, _gen_datetime_sql, _gen_pol_sql, _gen_pub_sql,
+                     _gen_science_sql, _gen_spec_res_sql, ALMA_DATE_FORMAT)
 
 __all__ = {'NraoClass',}
 
