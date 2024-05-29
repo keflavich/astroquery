@@ -191,8 +191,8 @@ class NraoClass(BaseQuery):
     def _get_dataarchive_url(self):
         return tap_urls[0]
 
-    def query_region_async(self, coordinate, radius, *, public=True,
-                           science=True, payload=None, **kwargs):
+    def query_region_async(self, coordinate, radius, *,
+                           payload=None, **kwargs):
         """
         Query the NRAO archive with a source name and radius
 
@@ -202,12 +202,6 @@ class NraoClass(BaseQuery):
             the identifier or coordinates around which to query.
         radius : str / `~astropy.units.Quantity`, optional
             the radius of the region
-        public : bool
-            True to return only public datasets, False to return private only,
-            None to return both
-        science : bool
-            True to return only science datasets, False to return only
-            calibration, None to return both
         payload : dict
             Dictionary of additional keywords.  See `help`.
         """
@@ -223,8 +217,7 @@ class NraoClass(BaseQuery):
         else:
             payload['ra_dec'] = ra_dec
 
-        return self.query_async(public=public, science=science,
-                                payload=payload, **kwargs)
+        return self.query_async(payload=payload, **kwargs)
 
     def query_async(self, payload, *, get_query_payload=False,
                     maxrec=None, **kwargs):
@@ -235,12 +228,6 @@ class NraoClass(BaseQuery):
         ----------
         payload : dictionary
             Please consult the `help` method
-        public : bool
-            True to return only public datasets, False to return private only,
-            None to return both
-        science : bool
-            True to return only science datasets, False to return only
-            calibration, None to return both
         legacy_columns : bool
             True to return the columns from the obsolete NRAO advanced query,
             otherwise return the current columns based on ObsCore model.
