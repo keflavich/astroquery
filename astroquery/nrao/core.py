@@ -33,9 +33,10 @@ from ..utils.process_asyncs import async_to_sync
 from ..query import BaseQuery, QueryWithLogin, BaseVOQuery
 from . import conf, auth_urls, tap_urls
 from astroquery.exceptions import CorruptDataWarning
-from ..alma.tapsql import (_gen_pos_sql, _gen_str_sql, _gen_numeric_sql,
+from ..alma.tapsql import (_gen_str_sql, _gen_numeric_sql,
                      _gen_band_list_sql, _gen_datetime_sql, _gen_pol_sql, _gen_pub_sql,
                      _gen_science_sql, _gen_spec_res_sql, ALMA_DATE_FORMAT)
+from .tapsql import (_gen_pos_sql)
 
 __all__ = {'NraoClass',}
 
@@ -191,6 +192,29 @@ class NraoClass(BaseQuery):
     def _get_dataarchive_url(self):
         return tap_urls[0]
 
+    def query_object_async(self, object_name, *, payload=None, **kwargs):
+        """
+        Query the archive for a source name.
+
+        Parameters
+        ----------
+        object_name : str
+            The object name.  Will be resolved by astropy.coord.SkyCoord
+        public : bool
+            True to return only public datasets, False to return private only,
+            None to return both
+        science : bool
+            True to return only science datasets, False to return only
+            calibration, None to return both
+        payload : dict
+            Dictionary of additional keywords.  See `help`.
+        """
+        if payload is not None:
+            payload['source_name_resolver'] = object_name
+        else:
+            payload = {'source_name_resolver': object_name}
+        return self.query_async(payload=payload, **kwargs)
+
     def query_region_async(self, coordinate, radius, *,
                            payload=None, **kwargs):
         """
@@ -251,9 +275,9 @@ class NraoClass(BaseQuery):
                 payload[arg] = '{} {}'.format(payload[arg], value)
             else:
                 payload[arg] = value
-
+        print(payload)
         query = _gen_sql(payload)
-
+        print(query)
         if get_query_payload:
             # Return the TAP query payload that goes out to the server rather
             # than the unprocessed payload dict from the python side
@@ -266,25 +290,7 @@ class NraoClass(BaseQuery):
         else:
             # Should not happen
             raise RuntimeError('BUG: Unexpected result None')
-        if legacy_columns:
-            legacy_result = Table()
-            # add 'Observation date' column
 
-            for col_name in _OBSCORE_TO_NRAORESULT:
-                if col_name in result.columns:
-                    if col_name == 't_min':
-                        legacy_result['Observation date'] = \
-                            [Time(_['t_min'], format='mjd').strftime(
-                                NRAO_DATE_FORMAT) for _ in result]
-                    else:
-                        legacy_result[_OBSCORE_TO_NRAORESULT[col_name]] = \
-                            result[col_name]
-                else:
-                    log.error("Invalid column mapping in OBSCORE_TO_NRAORESULT: "
-                              "{}:{}.  Please "
-                              "report this as an Issue."
-                              .format(col_name, _OBSCORE_TO_NRAORESULT[col_name]))
-            return legacy_result
         return result
 
 
