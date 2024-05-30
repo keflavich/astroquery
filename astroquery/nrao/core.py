@@ -42,7 +42,17 @@ __all__ = {'NraoClass',}
 
 __doctest_skip__ = ['NraoClass.*']
 
-NRAO_BANDS = {}
+NRAO_BANDS = {
+    'L': (1*u.GHz,   2*u.GHz),
+    'S': (2*u.GHz,   4*u.GHz),
+    'C': (4*u.GHz,   8*u.GHz),
+    'X': (8*u.GHz,  12*u.GHz),
+    'U': (12*u.GHz, 18*u.GHz),
+    'K': (18*u.GHz, 26*u.GHz),
+    'A': (26*u.GHz, 39*u.GHz),
+    'Q': (39*u.GHz, 50*u.GHz),
+    'W': (80*u.GHz, 115*u.GHz)
+}
 
 TAP_SERVICE_PATH = 'tap'
 
@@ -50,16 +60,42 @@ NRAO_FORM_KEYS = {
     'Position': {
         'Source name (astropy Resolver)': ['source_name_resolver',
                                            'SkyCoord.from_name', _gen_pos_sql],
-        'Source name (NRAO)': ['source_name_alma', 'target_name', _gen_str_sql],
+        'Source name (NRAO)': ['source_name', 'target_name', _gen_str_sql],
         'RA Dec (Sexagesimal)': ['ra_dec', 's_ra, s_dec', _gen_pos_sql],
         'Galactic (Degrees)': ['galactic', 'gal_longitude, gal_latitude',
                                _gen_pos_sql],
         'Angular resolution (arcsec)': ['spatial_resolution',
                                         'spatial_resolution', _gen_numeric_sql],
-        'Largest angular scale (arcsec)': ['spatial_scale_max',
-                                           'spatial_scale_max', _gen_numeric_sql],
-        'Field of view (arcsec)': ['fov', 's_fov', _gen_numeric_sql]
+        'Field of view (arcsec)': ['fov', 's_fov', _gen_numeric_sql],
+        'Configuration': ['configuration', 'configuration', _gen_numeric_sql],
+        'Maximum UV Distance (meters)': ['max_uv_dist', 'max_uv_dist', _gen_numeric_sql]
+
+
     },
+    'Project': {
+        'Project code': ['project_code', 'project_code', _gen_str_sql],
+        'Telescope': ['instrument', 'instrument_name', _gen_str_sql],
+        'Number of Antennas': ['n_ants', 'num_antennas', _gen_str_sql],
+
+    },
+    'Time': {
+        'Observation start': ['start_date', 't_min', _gen_datetime_sql],
+        'Observation end': ['end_date', 't_max', _gen_datetime_sql],
+        'Integration time (s)': ['integration_time', 't_exptime',
+                                 _gen_numeric_sql]
+    },
+    'Polarization': {
+        'Polarisation type (Single, Dual, Full)': ['polarisation_type',
+                                                   'pol_states', _gen_pol_sql]
+    },
+    'Energy': {
+        'Frequency (GHz)': ['frequency', 'center_frequencies', _gen_numeric_sql],
+        'Bandwidth (Hz)': ['bandwidth', 'aggregate_bandwidth', _gen_numeric_sql],
+        'Spectral resolution (KHz)': ['spectral_resolution',
+                                      'em_resolution', _gen_spec_res_sql],
+        'Band': ['band_list', 'band_list', _gen_band_list_sql]
+    },
+
 }
 
 
@@ -200,12 +236,6 @@ class NraoClass(BaseQuery):
         ----------
         object_name : str
             The object name.  Will be resolved by astropy.coord.SkyCoord
-        public : bool
-            True to return only public datasets, False to return private only,
-            None to return both
-        science : bool
-            True to return only science datasets, False to return only
-            calibration, None to return both
         payload : dict
             Dictionary of additional keywords.  See `help`.
         """
