@@ -130,7 +130,7 @@ class IrsaClass(BaseVOQuery):
         return collections.to_table()
 
     @deprecated_renamed_argument(("selcols", "cache", "verbose"), ("columns", None, None), since="0.4.7")
-    def query_region(self, coordinates=None, *, catalog=None, spatial='Cone',
+    def query_region(self, coordinates=None, catalog=None, *, spatial='Cone',
                      radius=10 * u.arcsec, width=None, polygon=None,
                      get_query_payload=False, columns='*',
                      verbose=False, cache=True):
