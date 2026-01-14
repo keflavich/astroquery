@@ -26,8 +26,8 @@ class Conf(_config.ConfigNamespace):
         'Time limit for connecting to ZTF BTS server.')
     
     api_url = _config.ConfigItem(
-        'https://sites.astro.caltech.edu/ztf/bts/api.php',
-        'ZTF BTS API endpoint.')
+        'https://sites.astro.caltech.edu/ztf/bts/explorer.php',
+        'ZTF BTS Explorer endpoint.')
 
 
 conf = Conf()
