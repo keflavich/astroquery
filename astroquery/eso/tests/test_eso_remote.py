@@ -32,6 +32,7 @@ SGRA_SURVEYS = ['195.B-0283',
                 'CRIRESplus',
                 'ERIS-SPIFFIER',
                 'GIRAFFE',
+                'GRAVITY',
                 'HARPS',
                 'HAWKI',
                 'KMOS',
@@ -44,6 +45,7 @@ SGRA_SURVEYS = ['195.B-0283',
                 ]
 
 ONE_RECORD_SURVEYS = [
+    '109.22XS',
     '081.C-0827',
     '108.2289',
     '1100.A-0528',
