@@ -21,6 +21,7 @@ from astropy.coordinates import Angle
 from numpy.ma import MaskedArray
 
 import warnings
+from astropy.utils.decorators import deprecated
 from astropy.utils.exceptions import AstropyDeprecationWarning
 
 from . import conf
@@ -576,7 +577,7 @@ class ESAHubbleClass(EsaTap):
         To execute a cone search defined by a coordinate (an
         astropy.coordinate element or a target name which is resolved),
         a radius and a set of criteria to filter the results. This function
-        comprises the outputs of query_target, cone_search and query_criteria
+        comprises the outputs of query_object, cone_search and query_criteria
         methods.
 
         Parameters
@@ -695,7 +696,7 @@ class ESAHubbleClass(EsaTap):
     def query_metadata(self, *, output_format='votable', verbose=False):
         return
 
-    def query_target(self, name, *, filename=None, output_format='votable',
+    def query_object(self, name, *, filename=None, output_format='votable',
                      verbose=False, async_job=False, radius=7):
         """
         It executes a query over EHST and download the xml with the results.
@@ -728,6 +729,17 @@ class ESAHubbleClass(EsaTap):
                                  verbose=verbose, async_job=async_job)
 
         return table
+
+    @deprecated(since='0.4.12', alternative='query_object')
+    def query_target(self, name, *, filename=None, output_format='votable',
+                     verbose=False, async_job=False, radius=7):
+        """
+        It executes a query over EHST and download the xml with the results.
+
+        Deprecated, use `query_object` instead.
+        """
+        return self.query_object(name, filename=filename, output_format=output_format,
+                                 verbose=verbose, async_job=async_job, radius=radius)
 
     def query_criteria(self, *, calibration_level=None,
                        data_product_type=None, intent=None,

@@ -165,7 +165,7 @@ element in the list if the target name cannot be resolved).
   >>> target_name = 'M1'
   >>> target_resolver = 'ALL'
   >>> radius = u.Quantity(5, u.deg)
-  >>> result = Jwst.query_target(target_name=target_name, target_resolver=target_resolver, radius=radius)
+  >>> result = Jwst.query_object(target_name=target_name, target_resolver=target_resolver, radius=radius)
   >>> result  # doctest: +IGNORE_OUTPUT
             dist                  observationid           ...
     -------------------- -------------------------------- ...
@@ -194,7 +194,7 @@ This method uses the same parameters as query region, but also includes the targ
   >>> target_resolver = 'NED'
   >>> width = u.Quantity(5, u.deg)
   >>> height = u.Quantity(5, u.deg)
-  >>> result = Jwst.query_target(target_name=target_name, target_resolver=target_resolver,
+  >>> result = Jwst.query_object(target_name=target_name, target_resolver=target_resolver,
   ...                            width=width, height=height, async_job=True)
   INFO: Query finished. [astroquery.utils.tap.core]
   >>> result  # doctest: +IGNORE_OUTPUT

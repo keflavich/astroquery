@@ -87,6 +87,18 @@ vo_conesearch
   PyVO Simple Cone Search interface instead. There is no direct replacement
   for server validation. [#3548]
 
+esa.hubble
+^^^^^^^^^^
+
+- ``query_target`` is deprecated in favor of the new ``query_object``, for
+  consistency with the method name used in the rest of astroquery. [#3611]
+
+esa.jwst
+^^^^^^^^
+
+- ``query_target`` is deprecated in favor of the new ``query_object``, for
+  consistency with the method name used in the rest of astroquery. [#3611]
+
 Service fixes and enhancements
 ------------------------------
 

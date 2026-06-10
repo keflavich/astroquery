@@ -24,6 +24,7 @@ from astropy.coordinates.sky_coordinate import SkyCoord
 from astropy.io.votable import parse_single_table
 from astropy.table import Table
 from astropy.units import Quantity
+from astropy.utils.exceptions import AstropyDeprecationWarning
 from astroquery.exceptions import TableParseError
 
 from astroquery.esa.jwst import JwstClass
@@ -952,7 +953,13 @@ class TestTap:
             if f not in files_returned:
                 raise ValueError(f"Not found expected file: {f}")
 
-    def test_query_target_error(self):
+    def test_query_target_deprecated(self):
+        jwst = JwstClass(show_messages=False)
+        with pytest.warns(AstropyDeprecationWarning, match="Use query_object instead"):
+            with pytest.raises(ValueError):
+                jwst.query_target(target_name="M1", target_resolver="")
+
+    def test_query_object_error(self):
         # need to patch simbad query object here
         with patch("astroquery.simbad.SimbadClass.query_object",
                    side_effect=lambda object_name: parse_single_table(
@@ -964,14 +971,14 @@ class TestTap:
             vizier = Vizier()
             # Testing default parameters
             with pytest.raises((ValueError, TableParseError)) as err:
-                jwst.query_target(target_name="M1", target_resolver="")
+                jwst.query_object(target_name="M1", target_resolver="")
                 assert "This target resolver is not allowed" in err.value.args[0]
             with pytest.raises((ValueError, TableParseError)) as err:
-                jwst.query_target("TEST")
+                jwst.query_object("TEST")
                 assert ('This target name cannot be determined with this '
                         'resolver: ALL' in err.value.args[0] or 'Failed to parse' in err.value.args[0])
             with pytest.raises((ValueError, TableParseError)) as err:
-                jwst.query_target(target_name="M1", target_resolver="ALL")
+                jwst.query_object(target_name="M1", target_resolver="ALL")
                 assert err.value.args[0] in ["This target name cannot be determined "
                                              "with this resolver: ALL", "Missing "
                                              "required argument: 'width'"]
@@ -989,19 +996,19 @@ class TestTap:
 
             # coordinate_error = 'coordinate must be either a string or astropy.coordinates'
             with pytest.raises((ValueError, TableParseError)) as err:
-                jwst.query_target(target_name="TEST", target_resolver="SIMBAD",
+                jwst.query_object(target_name="TEST", target_resolver="SIMBAD",
                                   radius=units.Quantity(5, units.deg))
                 assert ('This target name cannot be determined with this '
                         'resolver: SIMBAD' in err.value.args[0] or 'Failed to parse' in err.value.args[0])
 
             with pytest.raises((ValueError, TableParseError)) as err:
-                jwst.query_target(target_name="TEST", target_resolver="NED",
+                jwst.query_object(target_name="TEST", target_resolver="NED",
                                   radius=units.Quantity(5, units.deg))
                 assert ('This target name cannot be determined with this '
                         'resolver: NED' in err.value.args[0] or 'Failed to parse' in err.value.args[0])
 
             with pytest.raises((ValueError, TableParseError)) as err:
-                jwst.query_target(target_name="TEST", target_resolver="VIZIER",
+                jwst.query_object(target_name="TEST", target_resolver="VIZIER",
                                   radius=units.Quantity(5, units.deg))
                 assert ('This target name cannot be determined with this resolver: '
                         'VIZIER' in err.value.args[0] or 'Failed to parse' in err.value.args[0])

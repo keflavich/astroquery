@@ -23,6 +23,7 @@ import astroquery.esa.utils.utils as esautils
 from astropy import log
 from astropy import units
 from astropy.coordinates import Angle, SkyCoord
+from astropy.utils.decorators import deprecated
 from astropy.table import vstack
 from astropy.units import Quantity
 from requests.exceptions import ConnectionError
@@ -479,7 +480,7 @@ class JwstClass(BaseQuery):
                                              verbose=verbose,
                                              dump_to_file=dump_to_file)
 
-    def query_target(self, target_name, *, target_resolver="ALL",
+    def query_object(self, target_name, *, target_resolver="ALL",
                      radius=None,
                      width=None,
                      height=None,
@@ -562,6 +563,15 @@ class JwstClass(BaseQuery):
                                  async_job=async_job,
                                  show_all_columns=show_all_columns,
                                  verbose=verbose)
+
+    @deprecated(since='0.4.12', alternative='query_object')
+    def query_target(self, *args, **kwargs):
+        """Searches for a specific target defined by its name and other parameters
+        TAP & TAP+
+
+        Deprecated, use `query_object` instead.
+        """
+        return self.query_object(*args, **kwargs)
 
     def resolve_target_coordinates(self, target_name, target_resolver):
         if target_resolver not in self.TARGET_RESOLVERS:

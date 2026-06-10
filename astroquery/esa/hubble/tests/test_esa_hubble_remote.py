@@ -115,9 +115,9 @@ class TestEsaHubbleRemoteData:
         result = esa_hubble.get_hap_hst_link(observation_id='jec071i9q')
         assert result == ['hst_16316_71_acs_sbc_f150lp_jec071i9']
 
-    def test_query_target(self):
+    def test_query_object(self):
         compressed_temp_file = os.path.join(self.temp_folder.name, "m31_query.xml.gz")
-        table = esa_hubble.query_target(name="m3", filename=compressed_temp_file)
+        table = esa_hubble.query_object(name="m3", filename=compressed_temp_file)
         assert 'observation_id' in table.columns
 
     def test_retrieve_observations_from_program(self):

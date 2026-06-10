@@ -25,6 +25,7 @@ import numpy as np
 import pytest
 from astropy import coordinates
 from astropy.table.table import Table
+from astropy.utils.exceptions import AstropyDeprecationWarning
 from pyvo.dal import DALQuery
 
 from astroquery.esa.hubble import ESAHubbleClass
@@ -149,11 +150,22 @@ class TestESAHubble:
     @patch('astroquery.esa.utils.utils.pyvo.dal.TAPService.capabilities', [])
     @patch.object(ESAHubbleClass, 'cone_search')
     @patch('astroquery.esa.utils.utils.execute_servlet_request')
-    def test_query_target(self, mock_servlet_request, mock_cone_search):
+    def test_query_object(self, mock_servlet_request, mock_cone_search):
         mock_servlet_request.return_value = {'objects': [{"raDegrees": 90, "decDegrees": 90}]}
         mock_cone_search.return_value = "test"
         ehst = ESAHubbleClass(show_messages=False)
-        table = ehst.query_target(name="test")
+        table = ehst.query_object(name="test")
+        assert table == "test"
+
+    @patch('astroquery.esa.utils.utils.pyvo.dal.TAPService.capabilities', [])
+    @patch.object(ESAHubbleClass, 'cone_search')
+    @patch('astroquery.esa.utils.utils.execute_servlet_request')
+    def test_query_target_deprecated(self, mock_servlet_request, mock_cone_search):
+        mock_servlet_request.return_value = {'objects': [{"raDegrees": 90, "decDegrees": 90}]}
+        mock_cone_search.return_value = "test"
+        ehst = ESAHubbleClass(show_messages=False)
+        with pytest.warns(AstropyDeprecationWarning, match="Use query_object instead"):
+            table = ehst.query_target(name="test")
         assert table == "test"
 
     @patch('astroquery.esa.utils.utils.pyvo.dal.TAPService.capabilities', [])

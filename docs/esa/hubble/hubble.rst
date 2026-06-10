@@ -36,7 +36,7 @@ Examples
 
 .. note::
     The recommended steps to work with eHST Astroquery module are described below:
-        #. Retrieve the desired observations, fulfilling the user requirements, using one of the following methods: ``query_target``, ``query_criteria``, ``cone_search`` or ``cone_search_criteria``. In the results, the user will allways find a column named 'observation_id' that will be used as a reference.
+        #. Retrieve the desired observations, fulfilling the user requirements, using one of the following methods: ``query_object``, ``query_criteria``, ``cone_search`` or ``cone_search_criteria``. In the results, the user will allways find a column named 'observation_id' that will be used as a reference.
         #. If all the products associated to an observation are required, then use ``download_product``.
         #. If only FITS files associated to an observation are required, then use ``download_fits_files``.
         #. It is possible to retrieve the name of the files associated to an observation using ``get_associated_files``, together with their calibration level, size and type.
@@ -47,13 +47,13 @@ Examples
 1. Querying target names in the Hubble archive
 ----------------------------------------------
 
-The query_target function queries the name of the target as given by the proposer of the observations.
+The query_object function queries the name of the target as given by the proposer of the observations.
 
 .. doctest-remote-data::
 
   >>> from astroquery.esa.hubble import ESAHubble
   >>> esahubble = ESAHubble()
-  >>> table = esahubble.query_target(name="m31", filename="m31_query.xml.gz")  # doctest: +IGNORE_OUTPUT
+  >>> table = esahubble.query_object(name="m31", filename="m31_query.xml.gz")  # doctest: +IGNORE_OUTPUT
 
 This will retrieve a table with the output of the query.
 It will also download a file storing all metadata for all observations
