@@ -7,6 +7,7 @@ from email.message import Message
 from pathlib import Path
 
 from astropy import units as u
+from astropy.utils.decorators import deprecated
 from astroquery.utils import commons
 from astroquery import log
 from astroquery.exceptions import LoginError
@@ -297,8 +298,8 @@ class HSAClass(BaseQuery):
 
         return filename
 
-    def query_hsa_tap(self, query, *, output_file=None,
-                      output_format="votable", verbose=False):
+    def query_tap(self, query, *, output_file=None,
+                  output_format="votable", verbose=False):
         """
         Launches a synchronous job to query HSA Tabular Access Protocol (TAP) Service
 
@@ -324,6 +325,17 @@ class HSAClass(BaseQuery):
                                    dump_to_file=output_file is not None)
         table = job.get_results()
         return table
+
+    @deprecated(since='0.4.12', alternative='query_tap')
+    def query_hsa_tap(self, query, *, output_file=None,
+                      output_format="votable", verbose=False):
+        """
+        Launches a synchronous job to query HSA Tabular Access Protocol (TAP) Service
+
+        Deprecated, use `query_tap` instead.
+        """
+        return self.query_tap(query, output_file=output_file,
+                              output_format=output_format, verbose=verbose)
 
     def get_tables(self, *, only_names=True, verbose=False):
         """
@@ -393,7 +405,7 @@ class HSAClass(BaseQuery):
         n_obs : int, optional
             the number of observations
         kwargs : dict
-            passed to `query_hsa_tap`
+            passed to `query_tap`
 
         Returns
         -------
@@ -416,7 +428,7 @@ class HSAClass(BaseQuery):
         columns : str, optional
             the columns to retrieve from the data table
         kwargs : dict
-            passed to `query_hsa_tap`
+            passed to `query_tap`
 
         Returns
         -------
@@ -431,7 +443,7 @@ class HSAClass(BaseQuery):
                  f"where contains("
                  f"point('ICRS', hsa.v_active_observation.ra, hsa.v_active_observation.dec), "
                  f"circle('ICRS', {coord.ra.degree},{coord.dec.degree},{r.to(u.deg).value}))=1")
-        return self.query_hsa_tap(query, **kwargs)
+        return self.query_tap(query, **kwargs)
 
 
 HSA = HSAClass()

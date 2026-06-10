@@ -17,6 +17,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 from astropy.io import fits
+from astropy.utils.exceptions import AstropyDeprecationWarning
 
 from astroquery.exceptions import LoginError
 from astroquery.esa.xmm_newton.core import XMMNewtonClass
@@ -54,20 +55,31 @@ class TestXMMNewton:
         dummyTapHandler = DummyXMMNewtonTapHandler("launch_job", parameters)
         return dummyTapHandler
 
-    def test_query_xsa_tap(self):
+    def test_query_tap(self):
         parameters = {'query': "select top 10 * from v_public_observations",
                       'output_file': "test2.vot",
                       'output_format': "votable",
                       'verbose': False}
 
         xsa = XMMNewtonClass(self.get_dummy_tap_handler())
-        xsa.query_xsa_tap(**parameters)
+        xsa.query_tap(**parameters)
         self.get_dummy_tap_handler().check_call("launch_job", parameters)
         self.get_dummy_tap_handler().check_parameters(parameters, "launch_job")
         self.get_dummy_tap_handler().check_method("launch_job")
         self.get_dummy_tap_handler().get_tables()
         self.get_dummy_tap_handler().get_columns()
         self.get_dummy_tap_handler().load_tables()
+
+    def test_query_xsa_tap_deprecated(self):
+        parameters = {'query': "select top 10 * from v_public_observations",
+                      'output_file': "test2.vot",
+                      'output_format': "votable",
+                      'verbose': False}
+
+        xsa = XMMNewtonClass(self.get_dummy_tap_handler())
+        with pytest.warns(AstropyDeprecationWarning, match="Use query_tap instead"):
+            xsa.query_xsa_tap(**parameters)
+        self.get_dummy_tap_handler().check_call("launch_job", parameters)
 
     def test_get_tables(self):
         parameters2 = {'only_names': True,

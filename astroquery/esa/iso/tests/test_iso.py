@@ -11,6 +11,8 @@ European Space Agency (ESA)
 
 import pytest
 
+from astropy.utils.exceptions import AstropyDeprecationWarning
+
 from astroquery.esa.iso import ISOClass
 from astroquery.esa.iso.tests.dummy_tap_handler import DummyISOTapHandler
 
@@ -77,14 +79,25 @@ class TestISO:
         res = ida.get_postcard(**parameters)
         assert res == "file.png", "File name is " + res + " and not file.png"
 
-    def test_query_ida_tap(self):
+    def test_query_tap(self):
         parameters = {'query': "select top 10 * from ida.observations",
                       'output_file': "test2.vot",
                       'output_format': "votable",
                       'verbose': False}
 
         ida = ISOClass(self.get_dummy_tap_handler())
-        ida.query_ida_tap(**parameters)
+        ida.query_tap(**parameters)
+        self.get_dummy_tap_handler().check_call("launch_job", parameters)
+
+    def test_query_ida_tap_deprecated(self):
+        parameters = {'query': "select top 10 * from ida.observations",
+                      'output_file': "test2.vot",
+                      'output_format': "votable",
+                      'verbose': False}
+
+        ida = ISOClass(self.get_dummy_tap_handler())
+        with pytest.warns(AstropyDeprecationWarning, match="Use query_tap instead"):
+            ida.query_ida_tap(**parameters)
         self.get_dummy_tap_handler().check_call("launch_job", parameters)
 
     def test_get_tables(self):

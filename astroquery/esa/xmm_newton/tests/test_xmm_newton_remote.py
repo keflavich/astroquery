@@ -172,29 +172,29 @@ class TestXMMNewtonRemote:
         c = SkyCoord.from_name(target_name, parse=True)
         query = ("select * from {} "
                  "where 1=contains({}, circle('ICRS', {}, {}, {}));")
-        table = xsa.query_xsa_tap(query.format(epic_source_table,
-                                               epic_source_column,
-                                               c.ra.degree,
-                                               c.dec.degree,
-                                               radius))
+        table = xsa.query_tap(query.format(epic_source_table,
+                                           epic_source_column,
+                                           c.ra.degree,
+                                           c.dec.degree,
+                                           radius))
         assert report_diff_values(epic_source, table)
-        table = xsa.query_xsa_tap(query.format(cat_4xmm_table,
-                                               cat_4xmm_column,
-                                               c.ra.degree,
-                                               c.dec.degree,
-                                               radius))
+        table = xsa.query_tap(query.format(cat_4xmm_table,
+                                           cat_4xmm_column,
+                                           c.ra.degree,
+                                           c.dec.degree,
+                                           radius))
         assert report_diff_values(cat_4xmm, table)
-        table = xsa.query_xsa_tap(query.format(stack_4xmm_table,
-                                               stack_4xmm_column,
-                                               c.ra.degree,
-                                               c.dec.degree,
-                                               radius))
+        table = xsa.query_tap(query.format(stack_4xmm_table,
+                                           stack_4xmm_column,
+                                           c.ra.degree,
+                                           c.dec.degree,
+                                           radius))
         assert report_diff_values(stack_4xmm, table)
-        table = xsa.query_xsa_tap(query.format(slew_source_table,
-                                               slew_source_column,
-                                               c.ra.degree,
-                                               c.dec.degree,
-                                               radius))
+        table = xsa.query_tap(query.format(slew_source_table,
+                                           slew_source_column,
+                                           c.ra.degree,
+                                           c.dec.degree,
+                                           radius))
         assert report_diff_values(slew_source, table)
 
     def test_download_proprietary_data_incorrect_credentials(self, tmp_cwd):

@@ -1,8 +1,11 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 import os
 
+import pytest
+
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.utils.exceptions import AstropyDeprecationWarning
 from ..core import HSAClass
 from ..tests.dummy_tap_handler import DummyHSATapHandler
 
@@ -17,19 +20,29 @@ class TestHSA:
         return dummyTapHandler
         os.remove("test.vot")
 
-    def test_query_hsa_tap(self):
+    def test_query_tap(self):
         parameters = {'query': "select top 10 * from hsa.v_active_observation",
                       'output_file': "test.vot",
                       'output_format': "votable",
                       'verbose': False}
         hsa = HSAClass(self.get_dummy_tap_handler())
-        hsa.query_hsa_tap(**parameters)
+        hsa.query_tap(**parameters)
         self.get_dummy_tap_handler().check_call("launch_job", parameters)
         self.get_dummy_tap_handler().check_parameters(parameters, "launch_job")
         self.get_dummy_tap_handler().check_method("launch_job")
         self.get_dummy_tap_handler().get_tables()
         self.get_dummy_tap_handler().get_columns()
         self.get_dummy_tap_handler().load_tables()
+
+    def test_query_hsa_tap_deprecated(self):
+        parameters = {'query': "select top 10 * from hsa.v_active_observation",
+                      'output_file': "test.vot",
+                      'output_format': "votable",
+                      'verbose': False}
+        hsa = HSAClass(self.get_dummy_tap_handler())
+        with pytest.warns(AstropyDeprecationWarning, match="Use query_tap instead"):
+            hsa.query_hsa_tap(**parameters)
+        self.get_dummy_tap_handler().check_call("launch_job", parameters)
 
     def test_get_tables(self):
         parameters = {'only_names': True,

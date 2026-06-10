@@ -87,6 +87,27 @@ vo_conesearch
   PyVO Simple Cone Search interface instead. There is no direct replacement
   for server validation. [#3548]
 
+esa.iso
+^^^^^^^
+
+- ``query_ida_tap`` is deprecated in favor of the new ``query_tap``, for
+  consistency with the generic TAP method name used in the rest of
+  astroquery. [#3610]
+
+esa.xmm_newton
+^^^^^^^^^^^^^^
+
+- ``query_xsa_tap`` is deprecated in favor of the new ``query_tap``, for
+  consistency with the generic TAP method name used in the rest of
+  astroquery. [#3610]
+
+esa.hsa
+^^^^^^^
+
+- ``query_hsa_tap`` is deprecated in favor of the new ``query_tap``, for
+  consistency with the generic TAP method name used in the rest of
+  astroquery. [#3610]
+
 Service fixes and enhancements
 ------------------------------
 

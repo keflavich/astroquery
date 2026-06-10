@@ -27,7 +27,7 @@ Examples
 .. doctest-remote-data::
 
   >>> from astroquery.esa.iso import ISO
-  >>> table = ISO.query_ida_tap(query=("SELECT tdt,ra,dec,aotname,target "
+  >>> table = ISO.query_tap(query=("SELECT tdt,ra,dec,aotname,target "
   ...                                  "FROM ida.observations "
   ...                                  "WHERE INTERSECTS(CIRCLE('ICRS',10.68470833,41.26875,"
   ...                                  "0.08333333333333333),"
@@ -60,7 +60,7 @@ Examples
   Length = 49 rows
 
 
-'query_ida_tap' executes a TAP (Tabular Access Protocol) query to the ISO archive. In this case,
+'query_tap' executes a TAP (Tabular Access Protocol) query to the ISO archive. In this case,
 the archive is queried to its main table ('ida.observations') for observations that overlaps the
 position ('ra=10.68470833, ec=41.26875' in degrees, that corresponds with M31).
 
@@ -69,7 +69,7 @@ The result of a query can be stored in a file by defining the output format and 
 .. doctest-remote-data::
 
   >>> from astroquery.esa.iso import ISO
-  >>> table = ISO.query_ida_tap(query="select top 10 * from ida.observations",
+  >>> table = ISO.query_tap(query="select top 10 * from ida.observations",
   ...                       output_format='csv', output_file='results10.csv')
 
 This will execute an ADQL query to query the first 10 observations in the ISO Data Archive. The result of
@@ -130,7 +130,7 @@ we can loop on the observations to download the best products (DEFAULT_DATA_SET)
 .. doctest-remote-data::
 
   >>> from astroquery.esa.iso import ISO
-  >>> table=ISO.query_ida_tap(query="SELECT tdt, revno, aotname, ra, dec  FROM " +
+  >>> table=ISO.query_tap(query="SELECT tdt, revno, aotname, ra, dec  FROM " +
   ...                               "ida.observations WHERE " +
   ...                               "revno=800 and aotname like 'S%' and target != ''")
   >>> print(table)   # doctest: +IGNORE_OUTPUT
@@ -257,7 +257,7 @@ All these tables can be queried using the TAP interface and allow geometrical qu
   >>> dec = str(c.dec.degree[0])
   >>>
   >>> # Then we use these coordinates to discover spectral data
-  >>> table = ISO.query_ida_tap(query="SELECT target_name, ra, dec, reference " +
+  >>> table = ISO.query_tap(query="SELECT target_name, ra, dec, reference " +
   ...								"FROM ivoa.ssap WHERE " +
   ...                               "INTERSECTS(CIRCLE('ICRS'," + ra + "," + dec +
   ...								",0.08333333333333333)," +
@@ -277,7 +277,7 @@ Same can be done to discover images M31 images:
 .. doctest-remote-data::
 
   >>> # We use again the coordinates to discover image data
-  >>> table = ISO.query_ida_tap(query="SELECT image_title, ra, dec, access_url " +
+  >>> table = ISO.query_tap(query="SELECT image_title, ra, dec, access_url " +
   ...                               "FROM ivoa.siap WHERE " +
   ...                               "INTERSECTS(CIRCLE('ICRS'," + ra + "," + dec +
   ...                               ",0.08333333333333333)," +
@@ -343,7 +343,7 @@ And spectra can be displayed by using the following code:
   >>> from specutils import Spectrum1D
   >>>
   >>> # Search for M31 spectra
-  >>> table=ISO.query_ida_tap(query="SELECT target_name, ra, dec, " +
+  >>> table=ISO.query_tap(query="SELECT target_name, ra, dec, " +
   ...                               "axes, units, reference FROM ivoa.ssap " +
   ...                               "WHERE " +
   ...                               "INTERSECTS(CIRCLE('ICRS',10.68470833,41.26875," +

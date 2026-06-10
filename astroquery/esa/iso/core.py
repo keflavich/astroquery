@@ -9,6 +9,7 @@ European Space Agency (ESA)
 
 """
 import re
+from astropy.utils.decorators import deprecated
 from astroquery.utils.tap.core import TapPlus
 from astroquery.query import BaseQuery
 import shutil
@@ -228,8 +229,8 @@ class ISOClass(BaseQuery):
 
         return filename
 
-    def query_ida_tap(self, query, *, output_file=None,
-                      output_format="votable", verbose=False):
+    def query_tap(self, query, *, output_file=None,
+                  output_format="votable", verbose=False):
         """
         Launches a synchronous job to query ISO Tabular Access Protocol Service
 
@@ -259,6 +260,17 @@ class ISOClass(BaseQuery):
             return table
         except HTTPError as e:
             print(str(e))
+
+    @deprecated(since='0.4.12', alternative='query_tap')
+    def query_ida_tap(self, query, *, output_file=None,
+                      output_format="votable", verbose=False):
+        """
+        Launches a synchronous job to query ISO Tabular Access Protocol Service
+
+        Deprecated, use `query_tap` instead.
+        """
+        return self.query_tap(query, output_file=output_file,
+                              output_format=output_format, verbose=verbose)
 
     def get_tables(self, *, only_names=True, verbose=False):
         """

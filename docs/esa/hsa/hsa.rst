@@ -96,7 +96,7 @@ Query Language (`ADQL <https://www.ivoa.net/documents/ADQL/20180112/PR-ADQL-2.1-
 
   >>> from astroquery.esa.hsa import HSA
   >>>
-  >>> result = HSA.query_hsa_tap("select top 10 * from hsa.v_active_observation",
+  >>> result = HSA.query_tap("select top 10 * from hsa.v_active_observation",
   ...                            output_format='csv', output_file='results.csv')
   >>> result.pprint(max_width=100)
                     aor                           bii         ...  target_name   urn_version
@@ -206,7 +206,7 @@ First retrieve the observation IDs based on a position on the sky. To achive thi
 
   >>> from astroquery.esa.hsa import HSA
   >>>
-  >>> HSA.query_hsa_tap("select top 10 observation_id from hsa.v_active_observation where "
+  >>> HSA.query_tap("select top 10 observation_id from hsa.v_active_observation where "
   ...                   "contains(point('ICRS', hsa.v_active_observation.ra, hsa.v_active_observation.dec), "
   ...                   "circle('ICRS', 100.2417,9.895, 1.1))=1", output_format='csv', output_file='results.csv')
   <Table length=9>

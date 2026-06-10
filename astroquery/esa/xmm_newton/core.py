@@ -19,6 +19,7 @@ from email.message import Message
 from astropy.io import fits
 from astroquery import log
 from astropy.coordinates import SkyCoord
+from astropy.utils.decorators import deprecated
 
 from . import conf
 from ...exceptions import LoginError
@@ -205,8 +206,8 @@ class XMMNewtonClass(BaseQuery):
 
         return filename
 
-    def query_xsa_tap(self, query, *, output_file=None,
-                      output_format="votable", verbose=False):
+    def query_tap(self, query, *, output_file=None,
+                  output_format="votable", verbose=False):
         """Launches a synchronous job to query the XSA tap
 
         Parameters
@@ -232,6 +233,16 @@ class XMMNewtonClass(BaseQuery):
                                    dump_to_file=output_file is not None)
         table = job.get_results()
         return table
+
+    @deprecated(since='0.4.12', alternative='query_tap')
+    def query_xsa_tap(self, query, *, output_file=None,
+                      output_format="votable", verbose=False):
+        """Launches a synchronous job to query the XSA tap
+
+        Deprecated, use `query_tap` instead.
+        """
+        return self.query_tap(query, output_file=output_file,
+                              output_format=output_format, verbose=verbose)
 
     def get_tables(self, *, only_names=True, verbose=False):
         """Get the available table in XSA TAP service
@@ -661,30 +672,30 @@ class XMMNewtonClass(BaseQuery):
 
         query_fmt = ("select {} from {} "
                      "where 1=contains({}, circle('ICRS', {}, {}, {}));")
-        epic_source_table = self.query_xsa_tap(query_fmt.format(cols,
-                                                                epic_source["table"],
-                                                                epic_source["column"],
-                                                                c.ra.degree,
-                                                                c.dec.degree,
-                                                                radius))
-        cat_4xmm_table = self.query_xsa_tap(query_fmt.format(cols,
-                                                             cat_4xmm["table"],
-                                                             cat_4xmm["column"],
-                                                             c.ra.degree,
-                                                             c.dec.degree,
-                                                             radius))
-        stack_4xmm_table = self.query_xsa_tap(query_fmt.format(cols,
-                                                               stack_4xmm["table"],
-                                                               stack_4xmm["column"],
-                                                               c.ra.degree,
-                                                               c.dec.degree,
-                                                               radius))
-        slew_source_table = self.query_xsa_tap(query_fmt.format(cols,
-                                                                slew_source["table"],
-                                                                slew_source["column"],
-                                                                c.ra.degree,
-                                                                c.dec.degree,
-                                                                radius))
+        epic_source_table = self.query_tap(query_fmt.format(cols,
+                                                            epic_source["table"],
+                                                            epic_source["column"],
+                                                            c.ra.degree,
+                                                            c.dec.degree,
+                                                            radius))
+        cat_4xmm_table = self.query_tap(query_fmt.format(cols,
+                                                         cat_4xmm["table"],
+                                                         cat_4xmm["column"],
+                                                         c.ra.degree,
+                                                         c.dec.degree,
+                                                         radius))
+        stack_4xmm_table = self.query_tap(query_fmt.format(cols,
+                                                           stack_4xmm["table"],
+                                                           stack_4xmm["column"],
+                                                           c.ra.degree,
+                                                           c.dec.degree,
+                                                           radius))
+        slew_source_table = self.query_tap(query_fmt.format(cols,
+                                                            slew_source["table"],
+                                                            slew_source["column"],
+                                                            c.ra.degree,
+                                                            c.dec.degree,
+                                                            radius))
         return epic_source_table, cat_4xmm_table, stack_4xmm_table, slew_source_table
 
     def get_epic_lightcurve(self, filename, source_number, *,

@@ -92,7 +92,7 @@ Query Language (ADQL).
 
   >>> from astroquery.esa.xmm_newton import XMMNewton
   >>>
-  >>> result = XMMNewton.query_xsa_tap("select top 10 * from v_public_observations",
+  >>> result = XMMNewton.query_tap("select top 10 * from v_public_observations",
   ...                                  output_format='csv', output_file='results10.csv')
   >>> print(result)     # doctest: +IGNORE_OUTPUT
           bii             dec    duration ...      target      with_science
