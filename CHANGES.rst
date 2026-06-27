@@ -233,6 +233,10 @@ Infrastructure, Utility and Other Changes and Additions
 
 - Workaround upstream bug when caching a response using pyvo. [#3586]
 
+- Reduced the size of the test data distributed with astroquery (the
+  ``tests/data`` directories) from ~17 MB to ~3 MB by trimming oversized
+  fixtures to the minimum needed by their tests. [#3621]
+
 utils.tap
 ^^^^^^^^^
 
