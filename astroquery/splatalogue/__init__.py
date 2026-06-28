@@ -29,6 +29,22 @@ class Conf(_config.ConfigNamespace):
     lines_limit = _config.ConfigItem(
         1000,
         'Limit to number of lines exported.')
+    db_path = _config.ConfigItem(
+        '',
+        'Path to a local CASA-hosted Splatalogue SQLite database. If empty, '
+        'the database is auto-located from a CASA/casaconfig installation '
+        'when a local query is requested.')
+    use_local = _config.ConfigItem(
+        'fallback',
+        "Default routing for ``query_lines``: 'never' (web only), 'fallback' "
+        "(query the web service, but fall back to a local CASA Splatalogue "
+        "database if the service times out or is unreachable), or 'always' "
+        "(query the local database directly, never touching the network).",
+        cfgtype='string')
+    local_table = _config.ConfigItem(
+        '',
+        'Name of the table to read inside the local Splatalogue SQLite '
+        'database. If empty, the table is detected automatically.')
 
 
 conf = Conf()

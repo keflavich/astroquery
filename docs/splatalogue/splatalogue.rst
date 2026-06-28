@@ -250,6 +250,67 @@ data sorted by energy, you can use an approach like this:
 There are utility functions in ``astroquery.splatalogue.utils`` that automate
 some of the above cleanup.
 
+Offline / local queries against a CASA database
+===============================================
+
+CASA ships a curated SQLite snapshot of the Splatalogue database that its
+``slsearch``/``sltotable`` tasks query entirely offline.  astroquery can use
+that database directly, which is helpful when ``splatalogue.online`` is slow or
+unreachable.
+
+By default, ``query_lines`` queries the web service and only falls back to the
+local database if the service times out or cannot be reached (and a local
+database is available).  This is controlled by the ``use_local`` argument (or
+the ``Splatalogue.conf.use_local`` configuration item), which accepts:
+
+* ``'never'`` (or `False`) -- query the web service only;
+* ``'fallback'`` -- query the web service, falling back to the local database on
+  a timeout/connection error (the default);
+* ``'always'`` (or `True`) -- query the local database directly, never touching
+  the network.
+
+.. doctest-skip::
+
+    >>> from astroquery.splatalogue import Splatalogue
+    >>> import astropy.units as u
+    >>> # force a fully-offline query
+    >>> table = Splatalogue.query_lines(114 * u.GHz, 116 * u.GHz,
+    ...                                 chemical_name=' CO ', use_local='always')
+
+The database is located automatically from a CASA / ``casaconfig`` installation.
+If that fails, or to use a specific file, set its path explicitly:
+
+.. doctest-skip::
+
+    >>> Splatalogue.conf.db_path = '/path/to/splatalogue.db'
+
+or set the ``CASA_SPLATALOGUE_DB`` environment variable.
+
+The snapshot is derived from the same Splatalogue database that backs the web
+service, so the returned table is a drop-in for the online result (including
+``minimize_table``).  In CASA's database the line data lives in a ``main``
+table, with species names in a separate ``species`` table (joined on
+``species_id``) and the line list stored as an integer ``ll_id``; astroquery
+performs the join and maps ``ll_id`` onto the web line-list names
+(``CDMS``, ``JPL``, ``SLAIM``, ``LovasNIST``, ``Recombination``, ``TopModel``)
+automatically.  The exact column/table names vary between CASA releases; the
+schema is introspected at query time, and
+`~astroquery.splatalogue.local.describe_db` prints what was detected so a custom
+``column_mapping`` can be supplied if needed:
+
+.. doctest-skip::
+
+    >>> Splatalogue.describe_local_db()
+
+.. note::
+
+    The bundled database is a snapshot and therefore lags the live site; it will
+    not contain the most recent CDMS/JPL updates.  It is also de-duplicated:
+    unlike the web service, which may report the same transition once per line
+    list, the CASA database stores each line once (under a single line list), so
+    local results can have fewer rows and a different ``linelist`` tag than the
+    online query.
+
 Troubleshooting
 ===============
 

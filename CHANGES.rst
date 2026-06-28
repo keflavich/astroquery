@@ -111,6 +111,14 @@ heasarc
 - Add automatic guessing for the data host in ``download_data``. [#3403]
 - Include method to count the number of rows in a specified table. [#3549]
 
+splatalogue
+^^^^^^^^^^^
+
+- ``query_lines`` can now query a local CASA-hosted Splatalogue SQLite database
+  instead of the web service, via the ``use_local`` argument (or the
+  ``conf.use_local`` option). By default it falls back to the local database
+  when ``splatalogue.online`` times out or is unreachable. [#3623]
+
 gaia
 ^^^^
 

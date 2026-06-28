@@ -7,6 +7,10 @@ ftp://ftp.cv.nrao.edu/NRAO-staff/bkent/slap/idl/
 :author: Adam Ginsburg <adam.g.ginsburg@gmail.com>
 """
 import json
+import warnings
+
+import requests
+
 from astropy.table import Table
 from astropy import units as u
 from ..query import BaseQuery
@@ -17,7 +21,12 @@ from .utils import clean_column_headings
 
 from astropy.utils.decorators import deprecated_renamed_argument
 
-__all__ = ['Splatalogue', 'SplatalogueClass']
+__all__ = ['Splatalogue', 'SplatalogueClass', 'SplatalogueWebFailWarning']
+
+
+class SplatalogueWebFailWarning(Warning):
+    """Warning emitted when a web query falls back to the local database."""
+
 
 # example query of SPLATALOGUE directly:
 # https://www.cv.nrao.edu/php/splat/c.php?sid%5B%5D=64&sid%5B%5D=108&calcIn=&data_version=v3.0&from=&to=&frequency_units=MHz&energy_range_from=&energy_range_to=&lill=on&tran=&submit=Search&no_atmospheric=no_atmospheric&no_potential=no_potential&no_probable=no_probable&include_only_nrao=include_only_nrao&displayLovas=displayLovas&displaySLAIM=displaySLAIM&displayJPL=displayJPL&displayCDMS=displayCDMS&displayToyaMA=displayToyaMA&displayOSU=displayOSU&displayRecomb=displayRecomb&displayLisa=displayLisa&displayRFI=displayRFI&ls1=ls1&ls5=ls5&el1=el1
@@ -496,6 +505,168 @@ class SplatalogueClass(BaseQuery):
         self.response = response
 
         return response
+
+    def _resolve_use_local(self, use_local):
+        """Normalize the ``use_local`` argument to 'never'/'fallback'/'always'."""
+        if use_local is None:
+            use_local = conf.use_local
+        if use_local is True:
+            return 'always'
+        if use_local is False:
+            return 'never'
+        if use_local not in ('never', 'fallback', 'always'):
+            raise ValueError("use_local must be one of None, True, False, "
+                             "'never', 'fallback', or 'always'; got "
+                             f"{use_local!r}")
+        return use_local
+
+    def query_lines(self, min_frequency=None, max_frequency=None, *,
+                    use_local=None, cache=True, **kwargs):
+        """
+        Query Splatalogue for spectral lines in a frequency range.
+
+        By default this queries the Splatalogue web service and, if that
+        service times out or cannot be reached, transparently falls back to a
+        local CASA-hosted SQLite copy of the database.
+
+        Parameters
+        ----------
+        min_frequency, max_frequency : `~astropy.units.Quantity`
+            The frequency (or spectral-equivalent) range to search.
+        use_local : None, bool, or {'never', 'fallback', 'always'}
+            Controls whether the local CASA database is used:
+
+            * ``'never'`` / `False` -- query the web service only.
+            * ``'fallback'`` -- query the web service, but fall back to the
+              local database if it times out or is unreachable.  This is the
+              default, configurable via ``Splatalogue.conf.use_local``.
+            * ``'always'`` / `True` -- query the local database directly,
+              without touching the network.
+            * `None` -- use ``Splatalogue.conf.use_local``.
+
+        All other keyword arguments are passed through to ``query_lines_async``
+        (web) or ``query_lines_local`` (local); see `_parse_kwargs`.
+
+        Returns
+        -------
+        table : `~astropy.table.Table`
+        """
+        mode = self._resolve_use_local(use_local)
+        get_query_payload = kwargs.get('get_query_payload', False)
+
+        if mode == 'always':
+            return self.query_lines_local(min_frequency=min_frequency,
+                                          max_frequency=max_frequency,
+                                          **kwargs)
+
+        try:
+            response = self.query_lines_async(min_frequency=min_frequency,
+                                              max_frequency=max_frequency,
+                                              cache=cache, **kwargs)
+            if get_query_payload or kwargs.get('field_help'):
+                return response
+            if hasattr(response, 'raise_for_status'):
+                response.raise_for_status()
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError) as ex:
+            return self._fallback_or_raise(ex, mode, min_frequency,
+                                           max_frequency, kwargs)
+        except requests.exceptions.HTTPError as ex:
+            # 5xx (e.g. 503/504 gateway timeouts) count as "service down"
+            status = getattr(getattr(ex, 'response', None), 'status_code', None)
+            if status is not None and 500 <= status < 600:
+                return self._fallback_or_raise(ex, mode, min_frequency,
+                                               max_frequency, kwargs)
+            raise
+
+        result = self._parse_result(response)
+        self.table = result
+        return result
+
+    def _fallback_or_raise(self, ex, mode, min_frequency, max_frequency, kwargs):
+        """Fall back to the local database, or re-raise the web error."""
+        from .local import find_local_db, SplatalogueDBError
+        if mode != 'fallback':
+            raise ex
+        try:
+            path = find_local_db()
+        except SplatalogueDBError:
+            # no local database available: surface the original web error
+            raise ex
+        warnings.warn("The Splatalogue web service could not be reached "
+                      f"({ex.__class__.__name__}); falling back to the local "
+                      f"CASA Splatalogue database at {path}.",
+                      SplatalogueWebFailWarning)
+        return self.query_lines_local(min_frequency=min_frequency,
+                                      max_frequency=max_frequency, **kwargs)
+
+    def query_lines_local(self, min_frequency=None, max_frequency=None, *,
+                          chemical_name=None, chem_re_flags=0,
+                          parse_chemistry_locally=True,
+                          energy_min=None, energy_max=None, energy_type=None,
+                          intensity_lower_limit=None, intensity_type=None,
+                          line_lists=None, export_limit=None,
+                          db_path=None, table=None, column_mapping=None,
+                          get_query_payload=False, **kwargs):
+        """
+        Query a local CASA-hosted Splatalogue SQLite database directly.
+
+        Accepts the subset of `query_lines` parameters that map onto columns of
+        the local database.  Web-only display/formatting options are accepted
+        and ignored.  The returned table uses the same column names as an
+        online query, so downstream helpers (e.g.
+        `~astroquery.splatalogue.utils.minimize_table`) work unchanged.
+
+        See `query_lines` for the common parameters and
+        `astroquery.splatalogue.local` for database location/schema overrides
+        (``db_path``, ``table``, ``column_mapping``).
+        """
+        from .local import query_local
+
+        species_ids = None
+        if chemical_name not in ('', {}, (), [], set(), None):
+            if not parse_chemistry_locally:
+                raise ValueError(
+                    "Local queries require parse_chemistry_locally=True to "
+                    "resolve a chemical_name to species ids offline.")
+            ids = self.get_species_ids(species_regex=chemical_name,
+                                       reflags=chem_re_flags)
+            if len(ids) == 0:
+                raise ValueError("No matching chemical species found.")
+            species_ids = list(ids.values())
+        elif getattr(self, 'data', {}).get('speciesSelectBox'):
+            species_ids = list(self.data['speciesSelectBox'])
+
+        if energy_type is not None and energy_type not in self.VALID_ENERGY_TYPES:
+            raise ValueError(f'energy_type must be one of {self.VALID_ENERGY_TYPES}')
+        if intensity_lower_limit is not None:
+            if intensity_type not in self.VALID_INTENSITY_TYPES:
+                raise ValueError("If you specify an intensity lower limit, you "
+                                 "must also specify a valid intensity_type "
+                                 f"(one of {self.VALID_INTENSITY_TYPES}).")
+
+        return query_local(min_frequency=min_frequency,
+                           max_frequency=max_frequency,
+                           species_ids=species_ids,
+                           energy_min=energy_min, energy_max=energy_max,
+                           energy_type=energy_type,
+                           intensity_lower_limit=intensity_lower_limit,
+                           intensity_type=intensity_type,
+                           line_lists=line_lists, export_limit=export_limit,
+                           db_path=db_path, table=table,
+                           column_mapping=column_mapping,
+                           get_query_payload=get_query_payload)
+
+    def describe_local_db(self, *, db_path=None, table=None):
+        """
+        Print the table/column schema of a local Splatalogue database.
+
+        Convenience wrapper around `astroquery.splatalogue.local.describe_db`,
+        useful for building a ``column_mapping`` for an unfamiliar CASA
+        database.
+        """
+        from .local import describe_db
+        return describe_db(db_path=db_path, table=table)
 
     def _parse_result(self, response, *, verbose=False):
         """
