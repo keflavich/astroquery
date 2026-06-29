@@ -258,33 +258,78 @@ CASA ships a curated SQLite snapshot of the Splatalogue database that its
 that database directly, which is helpful when ``splatalogue.online`` is slow or
 unreachable.
 
-By default, ``query_lines`` queries the web service and only falls back to the
-local database if the service times out or cannot be reached (and a local
-database is available).  This is controlled by the ``use_local`` argument (or
-the ``Splatalogue.conf.use_local`` configuration item), which accepts:
+Step 1 -- get the database
+--------------------------
+
+The database is a single SQLite file named ``splatalogue.db`` (a few hundred MB).
+You can obtain it in any of these ways:
+
+* **You already have CASA installed.**  The file ships with CASA's data package
+  (``casadata``), typically at
+  ``.../site-packages/casadata/__data__/ephemerides/splatalogue.db``.  Nothing
+  else to do -- skip to step 2.
+* **Install just the data package**, without a full CASA::
+
+      pip install casadata
+
+  This pulls in the ``splatalogue.db`` file (and lets astroquery find it
+  automatically).
+* **Use any copy of the file** you already have, by pointing astroquery at it
+  explicitly (step 2).
+
+Step 2 -- tell astroquery where it is
+-------------------------------------
+
+astroquery looks for the database in this order:
+
+1. an explicit path you pass or configure::
+
+       >>> from astroquery.splatalogue import Splatalogue
+       >>> Splatalogue.conf.db_path = '/path/to/splatalogue.db'   # doctest: +SKIP
+
+2. the ``CASA_SPLATALOGUE_DB`` environment variable::
+
+       $ export CASA_SPLATALOGUE_DB=/path/to/splatalogue.db
+
+3. **automatic discovery** from an importable ``casadata`` / ``casaconfig``
+   installation (so if you ``pip install casadata``, or run from a Python that
+   can ``import casadata``, it just works with no configuration).
+
+To check what was found and confirm the schema was understood, run:
+
+.. doctest-skip::
+
+    >>> Splatalogue.describe_local_db()
+
+Step 3 -- run queries offline
+-----------------------------
+
+The ``use_local`` argument of `~astroquery.splatalogue.SplatalogueClass.query_lines`
+(or the ``Splatalogue.conf.use_local`` configuration item, which sets the
+default) controls whether the local database is used:
 
 * ``'never'`` (or `False`) -- query the web service only;
 * ``'fallback'`` -- query the web service, falling back to the local database on
-  a timeout/connection error (the default);
+  a timeout/connection error (this is the default);
 * ``'always'`` (or `True`) -- query the local database directly, never touching
   the network.
+
+A fully-offline query looks exactly like an online one, with
+``use_local='always'``:
 
 .. doctest-skip::
 
     >>> from astroquery.splatalogue import Splatalogue
+    >>> from astroquery.splatalogue import utils
     >>> import astropy.units as u
-    >>> # force a fully-offline query
-    >>> table = Splatalogue.query_lines(114 * u.GHz, 116 * u.GHz,
-    ...                                 chemical_name=' CO ', use_local='always')
+    >>> table = Splatalogue.query_lines(88 * u.GHz, 365 * u.GHz,
+    ...                                 chemical_name=' SO ',
+    ...                                 energy_max=1500, energy_type='eu_k',
+    ...                                 use_local='always')
+    >>> utils.minimize_table(table)   # same column names as an online result
 
-The database is located automatically from a CASA / ``casaconfig`` installation.
-If that fails, or to use a specific file, set its path explicitly:
-
-.. doctest-skip::
-
-    >>> Splatalogue.conf.db_path = '/path/to/splatalogue.db'
-
-or set the ``CASA_SPLATALOGUE_DB`` environment variable.
+How it maps onto the web results
+--------------------------------
 
 The snapshot is derived from the same Splatalogue database that backs the web
 service, so the returned table is a drop-in for the online result (including
@@ -296,11 +341,7 @@ performs the join and maps ``ll_id`` onto the web line-list names
 automatically.  The exact column/table names vary between CASA releases; the
 schema is introspected at query time, and
 `~astroquery.splatalogue.local.describe_db` prints what was detected so a custom
-``column_mapping`` can be supplied if needed:
-
-.. doctest-skip::
-
-    >>> Splatalogue.describe_local_db()
+``column_mapping`` can be supplied if needed.
 
 .. note::
 
