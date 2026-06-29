@@ -1,5 +1,4 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
-import glob
 import os
 import sqlite3
 
@@ -273,31 +272,10 @@ def test_linelist_id_mapping_is_complete():
 
 # --- validation against a real CASA database, if one is installed -----------
 
-def _find_real_casa_db():
-    env = os.environ.get('CASA_SPLATALOGUE_DB')
-    if env and os.path.isfile(env):
-        return env
-    # precise patterns only (no '**' over large trees -- this runs at
-    # collection time, so it must stay fast)
-    patterns = [
-        '/Applications/CASA*.app/Contents/Frameworks/Python.framework/Versions/'
-        '*/lib/python*/site-packages/casadata/__data__/ephemerides/splatalogue.db',
-        os.path.expanduser('~/.casa/data/ephemerides/splatalogue.db'),
-    ]
-    try:
-        import casadata
-        patterns.insert(0, os.path.join(os.path.dirname(casadata.__file__),
-                                        '__data__', 'ephemerides', 'splatalogue.db'))
-    except Exception:
-        pass
-    for pat in patterns:
-        hits = glob.glob(pat)
-        if hits:
-            return hits[0]
-    return None
-
-
-_REAL_DB = _find_real_casa_db()
+# exercise the production discovery (fast: exact paths + precise globs)
+_REAL_DB = (os.environ.get('CASA_SPLATALOGUE_DB')
+            if os.path.isfile(os.environ.get('CASA_SPLATALOGUE_DB') or '')
+            else local._discover_casa_db())
 
 
 @pytest.mark.skipif(_REAL_DB is None,

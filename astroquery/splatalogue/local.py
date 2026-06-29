@@ -201,11 +201,55 @@ def _candidate_data_roots():
             yield r
 
 
+# the database sits at one of these subpaths relative to a CASA data root
+# (the casadata package layout, the measures-data layout, or the root itself)
+_DB_SUBPATHS = (
+    ('__data__', 'ephemerides', 'splatalogue.db'),
+    ('ephemerides', 'splatalogue.db'),
+    ('splatalogue.db',),
+)
+
+
+def _fallback_glob_patterns():
+    """Precise glob patterns (no recursive ``**``) for common CASA layouts."""
+    home = os.path.expanduser('~')
+    tail = ('lib/python*/site-packages/casadata/__data__/ephemerides/'
+            'splatalogue.db')
+    return [
+        # macOS CASA application bundle
+        '/Applications/CASA*.app/Contents/Frameworks/Python.framework/'
+        'Versions/*/' + tail,
+        # unpacked modular-CASA / monolithic distributions
+        os.path.join(home, 'casa*', 'lib', 'py', tail),
+        os.path.join(home, 'casa*', tail),
+        os.path.join('/opt', 'casa*', 'lib', 'py', tail),
+    ]
+
+
 def _discover_casa_db():
-    """Search known CASA data roots for a Splatalogue ``.db`` file."""
-    patterns = ('**/splatalogue*.db', '**/[Ss]platalogue/*.db', '**/splat*.db')
+    """Locate the Splatalogue ``.db`` file shipped with CASA.
+
+    Tries the fast, known default locations first (exact paths under an
+    importable ``casadata``/``casaconfig`` install or the usual data
+    directories), then precise globs for common CASA install layouts, and
+    only as a last resort does a recursive search of the data roots.
+    """
+    # 1. exact default locations -- no globbing
     for root in _candidate_data_roots():
-        for pattern in patterns:
+        for sub in _DB_SUBPATHS:
+            path = os.path.join(root, *sub)
+            if os.path.isfile(path):
+                return path
+
+    # 2. precise globs for common CASA install layouts
+    for pattern in _fallback_glob_patterns():
+        hits = sorted(glob.glob(pattern))
+        if hits:
+            return hits[0]
+
+    # 3. last resort: recursive search of the known data roots
+    for root in _candidate_data_roots():
+        for pattern in ('**/splatalogue*.db', '**/splat*.db'):
             hits = sorted(glob.glob(os.path.join(root, pattern), recursive=True))
             if hits:
                 return hits[0]
