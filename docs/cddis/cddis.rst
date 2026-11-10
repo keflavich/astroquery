@@ -2,10 +2,13 @@ NASA CDDIS GNSS Archive (`astroquery.cddis`)
 ============================================
 
 The `Crustal Dynamics Data Information System (CDDIS)
-<https://www.earthdata.nasa.gov/centers/cddis-daac>`_ archives GNSS observation
-data and derived products. Astroquery's ``cddis`` module provides directory
-browsing and file downloads from the CDDIS GNSS archive. It does not interpret
-RINEX observations or calculate telescope pointing coordinates.
+<https://www.earthdata.nasa.gov/centers/cddis-daac>`_ archives observation data
+and derived products from Global Navigation Satellite Systems (GNSS) such as the
+U.S. Global Positioning System (GPS), the Russian GLONASS and the European
+Galileo system. Astroquery's ``cddis`` module provides directory browsing and
+file downloads from the CDDIS GNSS archive. It does not interpret Receiver
+Independent Exchange Format (RINEX) observation files, the standard format for
+GNSS receiver data, or calculate telescope pointing coordinates.
 
 ==============
 Authentication
@@ -44,7 +47,15 @@ observation directory can be listed as follows:
     >>> files = CDDIS.query_files('data/daily/2025/001/25d')
     >>> files['name', 'path', 'is_directory']
 
-The CDDIS directory layout contains multiple GNSS product types. Consult the
+Daily data are organized as ``data/daily/<YYYY>/<DDD>/<YY><t>``, where ``YYYY``
+is the four-digit year, ``DDD`` the three-digit day of year, ``YY`` the
+two-digit year and ``t`` a letter giving the type of data. In the example above,
+``25d`` holds the 2025 files of type ``d``, Hatanaka-compressed RINEX
+observation data (Hatanaka compression is a lossless format that shrinks RINEX
+observation files and must be reversed with dedicated software before use);
+other letters denote, for example, uncompressed observations (``o``) or GPS
+(``n``), GLONASS (``g``) and Galileo (``l``) broadcast ephemerides. The CDDIS
+directory layout contains multiple GNSS product types. Consult the
 `CDDIS GNSS data documentation
 <https://www.earthdata.nasa.gov/data/space-geodesy-techniques/gnss>`_ to select
 the product and directory appropriate for your use.

@@ -18,7 +18,8 @@ __all__ = ['CDDIS', 'CDDISClass']
 @async_to_sync
 class CDDISClass(BaseQuery):
     """
-    Browse and download GNSS data from NASA's CDDIS archive.
+    Browse and download Global Navigation Satellite System (GNSS) data from
+    NASA's Crustal Dynamics Data Information System (CDDIS) archive.
 
     CDDIS requires an Earthdata Login account. Configure an Earthdata Login
     ``.netrc`` entry and authorize the CDDIS application before making requests.

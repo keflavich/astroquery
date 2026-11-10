@@ -1,7 +1,8 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 """
-Access GNSS data in the NASA CDDIS archive.
+Access Global Navigation Satellite System (GNSS) data in the NASA Crustal Dynamics
+Data Information System (CDDIS) archive.
 """
 
 from astropy import config as _config
