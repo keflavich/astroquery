@@ -10,7 +10,7 @@ from astropy.io import fits
 from astropy.table import Table
 
 from astroquery.exceptions import InvalidQueryError
-from .. import LamostClass, conf
+from .. import LamostClass, LamostPreDR10Class, conf
 from .helpers import DATA, create_mock_response
 
 COORD = SkyCoord(160.5, 29.1, unit='deg')
@@ -72,7 +72,7 @@ def test_query_region_medium_and_columns(client):
 
 def test_query_catalog_constraints(client):
     adql = client.query_catalog('stellar', constraints={'teff': (5000, 6000), 'snrg': (30, None), 'class': 'STAR'},
-                                where="logg > 4", order_by='teff', descending=True, max_rows=7,
+                                where="logg > 4", sort_by='teff', sort_order='desc', max_rows=7,
                                 get_query_payload=True)
     assert adql == ('SELECT TOP 7 * FROM "public".stellar WHERE teff >= 5000 AND teff <= 6000 '
                     "AND snrg >= 30 AND class = 'STAR' AND (logg > 4) ORDER BY teff DESC")
@@ -93,7 +93,11 @@ def test_string_literals_are_escaped(client):
     {'catalog_name': 'stellar', 'constraints': {'a': True}},
     {'catalog_name': 'stellar', 'coordinates': COORD},
     {'catalog_name': 'stellar', 'radius': 1},
-    {'catalog_name': 'stellar', 'order_by': 'a b'},
+    {'catalog_name': 'stellar', 'sort_by': 'a b'},
+    {'catalog_name': 'stellar', 'sort_order': 'up'},
+    {'catalog_name': 'stellar', 'page': 0},
+    {'catalog_name': 'stellar', 'page': 2, 'max_rows': None},
+    {'catalog_name': 'stellar', 'max_rows': 'some'},
     {'catalog_name': 'stellar', 'max_rows': 0},
 ])
 def test_query_catalog_rejects_bad_input(client, kwargs):
@@ -236,3 +240,152 @@ def test_download_catalog_no_overwrite(client, monkeypatch, tmp_path):
     monkeypatch.setattr(client, '_request', request)
     assert client.download_catalog('x.fits.gz', save_dir=tmp_path, overwrite=False) == str(existing)
     request.assert_not_called()
+
+
+# -------------------------------------------------------------- pagination
+def test_pagination_offset_and_default_order(client):
+    adql = client.query_catalog('catalogue', max_rows=50, page=3, get_query_payload=True)
+    assert adql == 'SELECT TOP 50 * FROM "public".catalogue ORDER BY obsid OFFSET 100'
+
+
+def test_first_page_has_no_offset(client):
+    adql = client.query_catalog('catalogue', max_rows=50, page=1, get_query_payload=True)
+    assert adql == 'SELECT TOP 50 * FROM "public".catalogue ORDER BY obsid'
+
+
+def test_pagination_respects_sort_and_cone(client):
+    adql = client.query_catalog('catalogue', max_rows=5, page=2, sort_by='snrg', sort_order='desc',
+                                get_query_payload=True)
+    assert adql.endswith('ORDER BY snrg DESC OFFSET 5')
+    adql = client.query_region(COORD, 1, max_rows=5, page=2, get_query_payload=True)
+    assert adql.endswith('ORDER BY separation OFFSET 5')
+
+
+def test_no_page_means_no_forced_order(client):
+    assert 'ORDER BY' not in client.query_catalog('catalogue', get_query_payload=True)
+
+
+def test_max_rows_all(client):
+    assert 'TOP' not in client.query_catalog('catalogue', max_rows='all', get_query_payload=True)
+
+
+def test_nearest_only(client):
+    adql = client.query_spectra(COORD, 1, nearest_only=True, snr_min=10, max_rows=50, get_query_payload=True)
+    assert adql.startswith('SELECT TOP 1 ') and 'ORDER BY separation' in adql and 'snrg >= 10' in adql
+
+
+@pytest.mark.parametrize('kwargs', [{'nearest_only': True}, {'nearest_only': 1},
+                                    {'nearest_only': True, 'coordinates': COORD, 'radius': 1, 'page': 2}])
+def test_nearest_only_validation(client, kwargs):
+    with pytest.raises(InvalidQueryError):
+        client.query_spectra(get_query_payload=True, **kwargs)
+
+
+# --------------------------------------------------------- pre-DR10 fallback
+LEGACY = dict(data_release='dr7', sub_version='v2.0')
+
+
+@pytest.mark.parametrize('release, version, legacy', [
+    ('dr10', 'v2.0', False), ('dr11', 'v1.0', False), ('dr12', 'v1.0', False),
+    ('dr10', 'v1.0', True), ('dr9', 'v2.0', True), ('dr3', 'v2.0', True), ('dr7', 'v0', True),
+])
+def test_release_dispatch(release, version, legacy):
+    assert LamostClass(token='', data_release=release, sub_version=version)._use_legacy is legacy
+
+
+def test_legacy_property_is_synced():
+    lamost = LamostClass(token='', **LEGACY)
+    assert isinstance(lamost.legacy, LamostPreDR10Class)
+    lamost.data_release, lamost.sub_version = 'dr8', 'v1.1'
+    assert (lamost.legacy.data_release, lamost.legacy.sub_version) == ('dr8', 'v1.1')
+
+
+def test_token_precedence_is_shared(monkeypatch):
+    monkeypatch.setenv('ASTROQUERY_NADC_LAMOST_TOKEN', 'envtoken')
+    assert LamostClass().token == 'envtoken'
+    assert LamostClass(token='explicit').token == 'explicit'
+    assert LamostClass(token='').token is None
+
+
+@pytest.mark.parametrize('method, args', [
+    ('query_tap', ('SELECT 1',)), ('get_tables', ()), ('query_ssa', (COORD, 1)),
+])
+def test_vo_only_methods_raise_for_legacy_releases(method, args):
+    with pytest.raises(NotImplementedError, match='VO service'):
+        getattr(LamostClass(token='', **LEGACY), method)(*args)
+
+
+def test_legacy_query_region_payload():
+    payload = LamostClass(token='', **LEGACY).query_region(COORD, 5 * u.arcsec, get_query_payload=True)
+    assert payload['ra'] == pytest.approx(160.5)
+    assert payload['sr'] == pytest.approx(5 / 3600)
+
+
+def test_legacy_query_region_results(monkeypatch):
+    lamost = LamostClass(token='', **LEGACY)
+    seen = {}
+
+    def fake(coordinates, radius, *, resolution, get_query_payload=False):
+        seen.update(radius=radius, resolution=resolution)
+        return Table({'obsid': [1, 2, 3], 'ra': [1., 2., 3.]})
+
+    monkeypatch.setattr(lamost.legacy, 'query_region', fake)
+    result = lamost.query_region(COORD, 0.5, resolution='medium', columns='obsid', max_rows=2)
+    assert result.colnames == ['obsid'] and len(result) == 2
+    assert seen['radius'].to_value(u.deg) == 0.5 and seen['resolution'] == 'medium'
+    with pytest.raises(InvalidQueryError, match='page'):
+        lamost.query_region(COORD, 0.5, page=2)
+
+
+def test_legacy_query_catalog_translates_arguments(monkeypatch):
+    lamost = LamostClass(token='', **LEGACY)
+    calls = []
+    monkeypatch.setattr(lamost.legacy, 'query_catalog', lambda name, **kw: calls.append((name, kw)) or Table())
+    lamost.query_catalog('catalogue', coordinates=COORD, radius=5 * u.arcsec,
+                         constraints={'snrg': (30, None), 'class': 'STAR'}, columns=['obsid'],
+                         sort_by='snrg', sort_order='desc', max_rows=None, page=2)
+    name, kw = calls[0]
+    assert name == 'catalogue'
+    assert kw['column_constraints'] == [
+        {'column_name': 'snrg', 'operation': 'between', 'min': 30},
+        {'column_name': 'class', 'operation': 'equal', 'constraint': 'STAR'}]
+    assert kw['position_constraints']['cone']['radius'] == pytest.approx(5.0)
+    assert (kw['max_rows'], kw['page'], kw['sort_by'], kw['sort_order']) == ('all', 2, 'snrg', 'desc')
+    with pytest.raises(InvalidQueryError, match='TAP'):
+        lamost.query_catalog('catalogue', where='x > 1')
+
+
+def test_legacy_query_spectra_and_stellar_delegate(monkeypatch):
+    lamost = LamostClass(token='', **LEGACY)
+    calls = []
+    for name in ('query_spectra', 'query_stellar_parameters'):
+        monkeypatch.setattr(lamost.legacy, name, lambda *a, _n=name, **kw: calls.append((_n, a, kw)) or Table())
+    lamost.query_spectra(COORD, 1, snr_min=10, teff_range=(5000, 6000), nearest_only=True)
+    lamost.query_stellar_parameters(snr_min=10)
+    assert calls[0][0] == 'query_spectra' and calls[0][2]['teff_range'] == (5000, 6000)
+    assert calls[0][1][1].to_value(u.deg) == 1 and calls[0][2]['nearest_only'] is True
+    assert calls[1][0] == 'query_stellar_parameters'
+    assert calls[1][2]['columns'][:3] == ['obsid', 'ra', 'dec']
+
+
+def test_legacy_metadata_and_repeat(monkeypatch):
+    lamost = LamostClass(token='', **LEGACY)
+    monkeypatch.setattr(lamost.legacy, 'get_metadata', lambda obsid, **kw: Table({'obsid': [obsid]}))
+    assert lamost.get_metadata('12')['obsid'][0] == 12
+    monkeypatch.setattr(lamost.legacy, 'query_repeat_observations',
+                        lambda **kw: {'unique_id': 'L1', 'related_obsids': ['5', '6']})
+    result = lamost.query_repeat_observations(obsid=5)
+    assert list(result['obsid']) == [5, 6] and list(result['uid']) == ['L1', 'L1']
+    monkeypatch.setattr(lamost.legacy, 'query_repeat_observations',
+                        lambda **kw: {'unique_id': None, 'related_obsids': []})
+    assert len(lamost.query_repeat_observations(obsid=5)) == 0
+
+
+def test_legacy_downloads_delegate(monkeypatch):
+    lamost = LamostClass(token='', **LEGACY)
+    url = lamost.get_spectrum_list(5, resolution='medium')[0]
+    assert url == lamost.legacy.get_spectrum_list(5, resolution='medium')[0]
+    monkeypatch.setattr(lamost.legacy, 'get_spectra', lambda *a, **kw: ['spectrum'])
+    monkeypatch.setattr(lamost.legacy, 'download_catalog', lambda *a, **kw: 'path')
+    assert lamost.get_spectra(5) == ['spectrum']
+    assert lamost.download_catalog('x') == 'path'

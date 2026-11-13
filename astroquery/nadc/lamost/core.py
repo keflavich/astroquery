@@ -18,12 +18,16 @@ import astropy.coordinates as coord
 import astropy.units as u
 import numpy as np
 from astropy.io import fits
+from astropy.table import Table
 from pyvo.dal import SSAService, TAPService
 
 from ...exceptions import InvalidQueryError
 from ...query import BaseQuery
 from ...utils import commons
 from . import conf
+from ._sql import LEGACY_METADATA
+from ._utils import _append_range_constraint
+from .core_predr10 import LamostPreDR10Class
 
 
 __all__ = ['Lamost', 'LamostClass',
@@ -89,18 +93,27 @@ class LamostClass(BaseQuery):
     release, and positions with SSAP, using `pyvo`. Spectra and catalog
     files are downloaded from the LAMOST OpenAPI.
 
-    The VO services exist for DR10 and later. Older releases can still be used
-    for `get_spectra` and `download_catalog`.
+    Releases before DR10 have no TAP service. For them the ``query_*``,
+    ``get_metadata`` and download methods transparently use the OpenAPI client
+    `~astroquery.nadc.lamost.LamostPreDR10Class` (also available as `legacy`),
+    with the same arguments; ``query_tap``, ``query_ssa`` and ``get_tables``
+    need a VO service and raise `NotImplementedError` there.
 
     Parameters
     ----------
     token : str, optional
-        Token appended to download requests for releases that require one.
-        Defaults to ``conf.token``. TAP and SSAP queries are anonymous.
+        Authentication token, used for downloads and for releases that need
+        one. Precedence: this argument, ``conf.token``, environment variables
+        such as ``ASTROQUERY_NADC_LAMOST_TOKEN``, then ``pylamost_config``.
+        Pass ``token=''`` to force anonymous access. TAP and SSAP queries are
+        anonymous.
     data_release : str, optional
         Data release (e.g. ``'dr10'``). Defaults to ``conf.data_release``.
     sub_version : str, optional
         Release sub-version (e.g. ``'v2.0'``). Defaults to ``conf.sub_version``.
+    pylamost_config : str or path-like, optional
+        Path of a pylamost-style config file containing ``token=...``, read
+        only if no other token source is set.
 
     Examples
     --------
@@ -108,11 +121,15 @@ class LamostClass(BaseQuery):
     >>> lamost = LamostClass(data_release='dr10', sub_version='v2.0')
     """
 
-    def __init__(self, *, token=None, data_release=None, sub_version=None):
+    def __init__(self, *, token=None, data_release=None, sub_version=None, pylamost_config=None):
         super().__init__()
-        self.token = (conf.token if token is None else token) or None
-        self.data_release = data_release or conf.data_release
-        self.sub_version = sub_version or conf.sub_version
+        # Configuration, token precedence and the pre-DR10 fallback live in the
+        # legacy client; creating it does not touch the network.
+        self._legacy = LamostPreDR10Class(token=token, data_release=data_release,
+                                          sub_version=sub_version, pylamost_config=pylamost_config)
+        self.token = self._legacy.token
+        self.data_release = self._legacy.data_release
+        self.sub_version = self._legacy.sub_version
         self._tap = None
         self._ssa = None
 
@@ -186,6 +203,7 @@ class LamostClass(BaseQuery):
         result : `~pyvo.dal.TAPResults`
             Use ``.to_table()`` for an `~astropy.table.Table`.
         """
+        self._require_vo('query_tap')
         if async_job:
             return self.tap.run_async(query, language='ADQL', maxrec=maxrec)
         return self.tap.run_sync(query, language='ADQL', maxrec=maxrec)
@@ -200,6 +218,7 @@ class LamostClass(BaseQuery):
             Mapping of table name to `pyvo.io.vosi.vodataservice.VOSITable`,
             whose ``columns`` give column names, units and descriptions.
         """
+        self._require_vo('get_tables')
         return dict(self.tap.tables)
 
     def _run(self, adql, *, get_query_payload, verbose=False):
@@ -234,9 +253,29 @@ class LamostClass(BaseQuery):
         separation = f"DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', {center}))"
         return condition, separation
 
+    @staticmethod
+    def _max_rows(max_rows):
+        if isinstance(max_rows, str) and max_rows == 'all':
+            return None
+        if max_rows is None:
+            return None
+        if isinstance(max_rows, (bool, np.bool_)) or not isinstance(max_rows, (int, np.integer)) or max_rows < 1:
+            raise InvalidQueryError("max_rows must be a positive integer, None or 'all'.")
+        return int(max_rows)
+
+    @staticmethod
+    def _page(page, max_rows):
+        if page is None:
+            return None
+        if isinstance(page, (bool, np.bool_)) or not isinstance(page, (int, np.integer)) or page < 1:
+            raise InvalidQueryError('page must be an integer >= 1.')
+        if max_rows is None:
+            raise InvalidQueryError('page requires a finite max_rows (the page size).')
+        return int(page)
+
     def query_catalog(self, catalog_name, *, coordinates=None, radius=None, constraints=None,
-                      where=None, columns=None, order_by=None, descending=False,
-                      max_rows=1000, get_query_payload=False):
+                      where=None, columns=None, sort_by=None, sort_order='asc',
+                      max_rows=1000, page=None, get_query_payload=False):
         """
         Query a table of the LAMOST database with simple constraints.
 
@@ -246,7 +285,7 @@ class LamostClass(BaseQuery):
             Table name in the ``public`` schema, e.g. ``'catalogue'``,
             ``'stellar'``, ``'med_catalogue'``; see `get_tables`.
         coordinates : str or `~astropy.coordinates.SkyCoord`, optional
-            Cone center. Requires ``radius``. Without ``order_by`` the cone
+            Cone center. Requires ``radius``. Without ``sort_by`` the cone
             results are ordered by distance from the center.
         radius : str, float or `~astropy.units.Quantity`, optional
             Cone radius; bare numbers are degrees.
@@ -255,54 +294,82 @@ class LamostClass(BaseQuery):
             an inclusive range (either bound may be `None`). All are combined
             with AND.
         where : str, optional
-            Additional raw ADQL condition, combined with AND.
+            Additional raw ADQL condition, combined with AND. Only available
+            for releases with a TAP service.
         columns : str or sequence of str, optional
             Columns to return. Default: all.
-        order_by : str, optional
+        sort_by : str, optional
             Column to sort by.
-        descending : bool, optional
-            Sort in descending order.
-        max_rows : int or None, optional
-            Maximum number of rows (default 1000); `None` for no limit.
+        sort_order : {"asc", "desc"}, optional
+            Sort order.
+        max_rows : int, None or 'all', optional
+            Maximum number of rows, or the page size when ``page`` is given
+            (default 1000). `None` or ``'all'`` for no limit.
+        page : int, optional
+            One-based page number, to retrieve large results in pieces of
+            ``max_rows`` rows. Rows are ordered by ``sort_by`` (default:
+            distance for cone searches, otherwise ``obsid``) so that pages do
+            not overlap. Pages are implemented with ``TOP n ... OFFSET m``,
+            which LAMOST's TAP service supports; for ``obsid`` it stays fast
+            because that column is indexed, while sorting on other columns can
+            take many seconds. For standard-ADQL paging over ``obsid`` use
+            ``constraints={'obsid': (last_obsid + 1, None)}`` with
+            ``sort_by='obsid'`` instead.
         get_query_payload : bool, optional
-            Return the ADQL query string instead of running it.
+            Return the ADQL query string (or, for releases without a TAP
+            service, the request parameters) instead of running it.
 
         Returns
         -------
         `~astropy.table.Table` or str
         """
+        if self._use_legacy:
+            return self._legacy_query_catalog(
+                catalog_name, coordinates=coordinates, radius=radius, constraints=constraints,
+                where=where, columns=columns, sort_by=sort_by, sort_order=sort_order,
+                max_rows=max_rows, page=page, get_query_payload=get_query_payload)
         if (coordinates is None) != (radius is None):
             raise InvalidQueryError('coordinates and radius must be provided together.')
+        if sort_order not in ('asc', 'desc'):
+            raise InvalidQueryError('sort_order must be asc or desc.')
+        max_rows = self._max_rows(max_rows)
+        page = self._page(page, max_rows)
         table = f'"public".{_identifier(catalog_name, "catalog_name")}'
         clauses = _constraint_clauses(constraints)
-        order = ''
-        if order_by is not None:
-            order = f' ORDER BY {_identifier(order_by)}{" DESC" if descending else ""}'
+        select = self._select(columns)
         select_extra = ''
+        order = ''
+        if sort_by is not None:
+            order = f'{_identifier(sort_by)}{" DESC" if sort_order == "desc" else ""}'
         if coordinates is not None:
             condition, separation = self._contains(coordinates, self._radius_deg(radius))
             clauses.insert(0, condition)
-            if order_by is None:
+            if sort_by is None:
                 select_extra = f', {separation} AS separation'
-                order = ' ORDER BY separation'
+                order = 'separation' + (' DESC' if sort_order == 'desc' else '')
+        elif page is not None and sort_by is None:
+            order = 'obsid' + (' DESC' if sort_order == 'desc' else '')
         if where:
             clauses.append(f'({where})')
-        select = self._select(columns)
-        if select_extra and select != '*':
-            select += select_extra
-        elif select_extra:
-            # ADQL 2.0 does not allow a bare ``*`` next to other select items.
-            select = f't.*{select_extra}'
+        if select_extra:
+            if select == '*':
+                # ADQL 2.0 does not allow a bare ``*`` next to other select items.
+                select = f't.*{select_extra}'
+            else:
+                select += select_extra
         adql = f'SELECT {self._top(max_rows)}{select} FROM {table}'
         if select.startswith('t.*'):
             adql += ' AS t'
         if clauses:
             adql += ' WHERE ' + ' AND '.join(clauses)
-        adql += order
+        if order:
+            adql += f' ORDER BY {order}'
+        if page is not None and page > 1:
+            adql += f' OFFSET {(page - 1) * max_rows}'
         return self._run(adql, get_query_payload=get_query_payload)
 
     def query_region(self, coordinates, radius, *, resolution='low', columns=None,
-                     max_rows=1000, get_query_payload=False):
+                     max_rows=1000, page=None, get_query_payload=False):
         """
         Cone search of the LAMOST spectral catalogue.
 
@@ -316,25 +383,27 @@ class LamostClass(BaseQuery):
             Low-resolution (LRS) or medium-resolution (MRS) catalogue.
         columns : str or sequence of str, optional
             Columns to return. Default: all.
-        max_rows : int or None, optional
-            Maximum number of rows (default 1000); `None` for no limit.
-        get_query_payload : bool, optional
-            Return the ADQL query string instead of running it.
+        max_rows, page, get_query_payload : optional
+            See `query_catalog`.
 
         Returns
         -------
         `~astropy.table.Table` or str
-            Rows sorted by distance, with a ``separation`` column in degrees.
+            Rows sorted by distance. With a TAP service the table has a
+            ``separation`` column in degrees.
         """
+        resolution = self._normalize_resolution(resolution)
+        if self._use_legacy:
+            return self._legacy_query_region(coordinates, radius, resolution=resolution, columns=columns,
+                                             max_rows=max_rows, page=page, get_query_payload=get_query_payload)
         return self.query_catalog(
-            _CATALOGUE[self._normalize_resolution(resolution)],
-            coordinates=coordinates, radius=radius, columns=columns,
-            max_rows=max_rows, get_query_payload=get_query_payload)
+            _CATALOGUE[resolution], coordinates=coordinates, radius=radius, columns=columns,
+            max_rows=max_rows, page=page, get_query_payload=get_query_payload)
 
     def query_spectra(self, coordinates=None, radius=None, *, resolution='low', catalog_name=None,
                       snr_min=None, teff_range=None, logg_range=None, feh_range=None,
-                      columns=None, order_by=None, descending=False, max_rows=1000,
-                      get_query_payload=False):
+                      columns=None, nearest_only=False, sort_by=None, sort_order='asc',
+                      max_rows=1000, page=None, get_query_payload=False):
         """
         Query spectral catalog rows with common quality filters.
 
@@ -352,14 +421,29 @@ class LamostClass(BaseQuery):
             Minimum signal-to-noise ratio (``snrg`` for LRS, ``snr`` for MRS).
         teff_range, logg_range, feh_range : (low, high), optional
             Inclusive ranges in K, dex (log10 cm/s2) and dex ([Fe/H]).
-        columns, order_by, descending, max_rows, get_query_payload : optional
+        columns : optional
+            Columns to return.
+        nearest_only : bool, optional
+            Return only the row nearest to ``coordinates`` that satisfies all
+            cuts. Requires coordinates; ``page`` must be `None` or 1.
+        sort_by, sort_order, max_rows, page, get_query_payload : optional
             See `query_catalog`.
 
         Returns
         -------
         `~astropy.table.Table` or str
         """
+        if not isinstance(nearest_only, bool) or (nearest_only and coordinates is None):
+            raise InvalidQueryError('nearest_only must be a boolean and True requires coordinates.')
+        if nearest_only and page not in (None, 1):
+            raise InvalidQueryError('nearest_only requires page=1.')
         resolution = self._normalize_resolution(resolution)
+        if self._use_legacy:
+            return self._legacy_query_spectra(
+                coordinates, radius, resolution=resolution, catalog_name=catalog_name, snr_min=snr_min,
+                teff_range=teff_range, logg_range=logg_range, feh_range=feh_range, columns=columns,
+                nearest_only=nearest_only, sort_by=sort_by, sort_order=sort_order,
+                max_rows=max_rows, page=page, get_query_payload=get_query_payload)
         fields = _SPECTRAL_FIELDS[resolution]
         constraints = {}
         if snr_min is not None:
@@ -371,10 +455,12 @@ class LamostClass(BaseQuery):
                 stellar = True
         if catalog_name is None:
             catalog_name = (_STELLAR if stellar else _CATALOGUE)[resolution]
+        if nearest_only:
+            max_rows, page = 1, None
         return self.query_catalog(
             catalog_name, coordinates=coordinates, radius=radius, constraints=constraints,
-            columns=columns, order_by=order_by, descending=descending,
-            max_rows=max_rows, get_query_payload=get_query_payload)
+            columns=columns, sort_by=sort_by, sort_order=sort_order,
+            max_rows=max_rows, page=page, get_query_payload=get_query_payload)
 
     def query_stellar_parameters(self, coordinates=None, radius=None, *, resolution='low',
                                  columns=None, **kwargs):
@@ -389,6 +475,10 @@ class LamostClass(BaseQuery):
         fields = _SPECTRAL_FIELDS[resolution]
         if columns is None:
             columns = ['obsid', 'ra', 'dec', fields['teff'], fields['logg'], fields['feh'], fields['snr']]
+        if self._use_legacy:
+            kwargs.setdefault('catalog_name', None)
+            return self._legacy_query_spectra(coordinates, radius, resolution=resolution, columns=columns,
+                                              stellar=True, **kwargs)
         kwargs.setdefault('catalog_name', _STELLAR[resolution])
         return self.query_spectra(coordinates, radius, resolution=resolution, columns=columns, **kwargs)
 
@@ -409,9 +499,14 @@ class LamostClass(BaseQuery):
         -------
         `~astropy.table.Table` or str
         """
+        resolution = self._normalize_resolution(resolution)
+        if self._use_legacy:
+            result = self.legacy.get_metadata(self._obsid(obsid), resolution=resolution,
+                                              get_query_payload=get_query_payload)
+            self.table = None if get_query_payload else result
+            return result
         return self.query_catalog(
-            _CATALOGUE[self._normalize_resolution(resolution)],
-            constraints={'obsid': self._obsid(obsid)}, max_rows=None,
+            _CATALOGUE[resolution], constraints={'obsid': self._obsid(obsid)}, max_rows=None,
             get_query_payload=get_query_payload)
 
     def query_repeat_observations(self, *, obsid=None, coordinates=None, radius=None,
@@ -426,24 +521,150 @@ class LamostClass(BaseQuery):
         Returns
         -------
         `~astropy.table.Table` or str
-            ``uid``, ``obsid``, ``ra``, ``dec`` and ``obsdate`` of every
-            observation, ordered by ``uid`` and ``obsid``.
+            With a TAP service: ``uid``, ``obsid``, ``ra``, ``dec`` and
+            ``obsdate`` of every observation, ordered by ``uid`` and ``obsid``.
+            For releases without one: ``uid`` and ``obsid`` only.
         """
         resolution = self._normalize_resolution(resolution)
-        table = f'"public".{_CATALOGUE[resolution]}'
         if (obsid is None) == (coordinates is None):
             raise InvalidQueryError('Provide either obsid or coordinates and radius.')
+        if obsid is not None and radius is not None:
+            raise InvalidQueryError('radius is only used with coordinates.')
+        if coordinates is not None and radius is None:
+            raise InvalidQueryError('coordinates and radius must be provided together.')
+        if self._use_legacy:
+            return self._legacy_repeat_observations(obsid, coordinates, radius, get_query_payload)
+        table = f'"public".{_CATALOGUE[resolution]}'
         if obsid is not None:
-            if radius is not None:
-                raise InvalidQueryError('radius is only used with coordinates.')
             inner = f'obsid = {self._obsid(obsid)}'
         else:
-            if radius is None:
-                raise InvalidQueryError('coordinates and radius must be provided together.')
             inner = self._contains(coordinates, self._radius_deg(radius))[0]
         adql = (f'SELECT uid, obsid, ra, dec, obsdate FROM {table} '
                 f'WHERE uid IN (SELECT uid FROM {table} WHERE {inner}) ORDER BY uid, obsid')
         return self._run(adql, get_query_payload=get_query_payload)
+
+    def get_dr_versions(self):
+        """
+        List the data releases and sub-versions known to the archive.
+
+        Returns
+        -------
+        list of dict
+            Service-provided release metadata, including ``dr_version``,
+            ``sub_version`` and ``public_status``.
+        """
+        return self.legacy.get_dr_versions()
+
+    # ------------------------------------------------ pre-DR10 fallback
+    @property
+    def legacy(self):
+        """
+        The `~astroquery.nadc.lamost.LamostPreDR10Class` client for the same
+        release, token and configuration.
+
+        Releases before DR10 have no TAP service, so the query methods of this
+        class delegate to it automatically. It also offers methods that exist
+        only for those releases, such as ``query_sql``.
+        """
+        legacy = self._legacy
+        legacy.data_release, legacy.sub_version, legacy.token = self.data_release, self.sub_version, self.token
+        return legacy
+
+    @property
+    def _use_legacy(self):
+        """True for releases without a TAP service (before DR10)."""
+        return self.sub_version in LEGACY_METADATA.get(self.data_release, ())
+
+    def _require_vo(self, what):
+        if self._use_legacy:
+            raise NotImplementedError(
+                f'{what} needs a VO service, which {self.data_release}/{self.sub_version} does not have '
+                '(VO services exist for DR10 v2.0 and later). The query_* methods work for this release; '
+                'for raw SQL use the `legacy` client.')
+
+    def _legacy_result(self, result):
+        self.table = result if isinstance(result, Table) else None
+        return result
+
+    def _legacy_query_region(self, coordinates, radius, *, resolution, columns, max_rows, page,
+                             get_query_payload):
+        if page is not None:
+            raise InvalidQueryError(f'page is not supported by query_region for {self.data_release}/'
+                                    f'{self.sub_version}; use query_catalog or query_spectra.')
+        radius = self._radius_deg(radius) * u.deg
+        result = self.legacy.query_region(coordinates, radius, resolution=resolution,
+                                          get_query_payload=get_query_payload)
+        if get_query_payload:
+            return result
+        max_rows = self._max_rows(max_rows)
+        if max_rows is not None:
+            result = result[:max_rows]
+        if columns is not None:
+            columns = [columns] if isinstance(columns, str) else list(columns)
+            result = result[columns]
+        return self._legacy_result(result)
+
+    def _legacy_query_catalog(self, catalog_name, *, coordinates, radius, constraints, where, columns,
+                              sort_by, sort_order, max_rows, page, get_query_payload):
+        if where:
+            raise InvalidQueryError(f'where (raw ADQL) needs a TAP service; not available for '
+                                    f'{self.data_release}/{self.sub_version}. Use constraints.')
+        if (coordinates is None) != (radius is None):
+            raise InvalidQueryError('coordinates and radius must be provided together.')
+        position = None
+        if coordinates is not None:
+            position = self.legacy._build_structured_cone_constraint(
+                coordinates, self._radius_deg(radius) * u.deg)
+        return self._legacy_catalog_call(
+            catalog_name, position, constraints, columns, sort_by, sort_order, max_rows, page,
+            get_query_payload)
+
+    def _legacy_catalog_call(self, catalog_name, position, constraints, columns, sort_by, sort_order,
+                             max_rows, page, get_query_payload):
+        column_constraints = []
+        for column, value in (constraints or {}).items():
+            column = _identifier(column)
+            if isinstance(value, (tuple, list)):
+                _append_range_constraint(column_constraints, column, value)
+            else:
+                column_constraints.append({'column_name': column, 'operation': 'equal',
+                                           'constraint': str(value)})
+        max_rows = self._max_rows(max_rows)
+        result = self.legacy.query_catalog(
+            catalog_name, column_constraints=column_constraints or None, position_constraints=position,
+            columns=columns, sort_by=sort_by, sort_order=sort_order,
+            max_rows='all' if max_rows is None else max_rows, page=1 if page is None else page,
+            get_query_payload=get_query_payload)
+        return result if get_query_payload else self._legacy_result(result)
+
+    def _legacy_query_spectra(self, coordinates, radius, *, resolution, catalog_name=None, snr_min=None,
+                              teff_range=None, logg_range=None, feh_range=None, columns=None,
+                              nearest_only=False, sort_by=None, sort_order='asc', max_rows=1000,
+                              page=None, get_query_payload=False, stellar=False):
+        if (coordinates is None) != (radius is None):
+            raise InvalidQueryError('coordinates and radius must be provided together.')
+        if radius is not None:
+            radius = self._radius_deg(radius) * u.deg
+        max_rows = self._max_rows(max_rows)
+        method = self.legacy.query_stellar_parameters if stellar else self.legacy.query_spectra
+        result = method(
+            coordinates, radius, resolution=resolution, catalog_name=catalog_name, snr_min=snr_min,
+            teff_range=teff_range, logg_range=logg_range, feh_range=feh_range, columns=columns,
+            nearest_only=nearest_only, sort_by=sort_by, sort_order=sort_order,
+            max_rows='all' if max_rows is None else max_rows, page=1 if page is None else page,
+            get_query_payload=get_query_payload)
+        return result if get_query_payload else self._legacy_result(result)
+
+    def _legacy_repeat_observations(self, obsid, coordinates, radius, get_query_payload):
+        kwargs = {'obsid': self._obsid(obsid)} if obsid is not None else {
+            'coordinates': coordinates, 'radius': self._radius_deg(radius) * u.deg}
+        result = self.legacy.query_repeat_observations(get_query_payload=get_query_payload, **kwargs)
+        if get_query_payload:
+            return result
+        related = [int(o) for o in result.get('related_obsids') or []]
+        table = Table([np.array([str(result.get('unique_id'))] * len(related), dtype='U32'),
+                       np.array(related, dtype='i8')], names=('uid', 'obsid'))
+        return self._legacy_result(table)
 
     @staticmethod
     def _obsid(obsid):
@@ -472,6 +693,7 @@ class LamostClass(BaseQuery):
             The catalogue columns plus the standard ``ssa_*`` columns and
             ``accref``, the URL of the spectrum FITS file.
         """
+        self._require_vo('query_ssa')
         c = commons.parse_coordinates(coordinates).icrs
         result = self.ssa.search(pos=c, diameter=2 * self._radius_deg(radius) * u.deg, maxrec=maxrec)
         table = result.to_table()
@@ -500,6 +722,8 @@ class LamostClass(BaseQuery):
             the token and must not be shared.
         """
         resolution = self._normalize_resolution(resolution)
+        if self._use_legacy:
+            return self.legacy.get_spectrum_list(self._obsid(obsid), resolution=resolution)
         res_path = 'mrs' if resolution == 'medium' else 'lrs'
         url = f'{self._openapi_url}/{res_path}/spectrum/fits'
         params = self._auth({'obsid': str(self._obsid(obsid))})
@@ -525,6 +749,8 @@ class LamostClass(BaseQuery):
         list of `~astropy.io.fits.HDUList`
             A single-element list. The caller must close the HDU lists.
         """
+        if self._use_legacy:
+            return self.legacy.get_spectra(self._obsid(obsid), resolution=resolution, verify=verify, cache=cache)
         url = self.get_spectrum_list(obsid, resolution=resolution)[0]
         response = self._request('GET', url, timeout=conf.timeout, cache=cache and not self.token)
         response.raise_for_status()
@@ -566,6 +792,9 @@ class LamostClass(BaseQuery):
             Path of the downloaded file.
         """
         resolution = self._normalize_resolution(resolution)
+        if self._use_legacy:
+            return self.legacy.download_catalog(catalog_name, resolution=resolution, save_dir=save_dir,
+                                                filename=filename, overwrite=overwrite, verify=verify)
         res_path = 'mrs' if resolution == 'medium' else 'lrs'
         url = f'{self._openapi_url}/{res_path}/catalog'
         name = os.path.basename(catalog_name)

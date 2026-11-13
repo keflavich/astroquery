@@ -5,6 +5,8 @@ import pytest
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
+from astroquery.exceptions import LoginError
+
 from .. import LamostClass, parse_lrs_spectrum
 
 pytestmark = pytest.mark.remote_data
@@ -67,3 +69,24 @@ def test_get_spectra_and_reader(lamost, tmp_path):
 def test_tap_dr12():
     lamost = LamostClass(data_release='dr12', sub_version='v1.0')
     assert any('catalogue' in name for name in lamost.get_tables())
+
+
+def test_pagination_pages_do_not_overlap(lamost):
+    kwargs = dict(columns=['obsid'], max_rows=20)
+    page1 = lamost.query_catalog('catalogue', page=1, **kwargs)
+    page2 = lamost.query_catalog('catalogue', page=2, **kwargs)
+    assert len(page1) == len(page2) == 20
+    assert set(page1['obsid']).isdisjoint(page2['obsid'])
+    assert max(page1['obsid']) < min(page2['obsid'])
+
+
+def test_pre_dr10_release_through_unified_entrypoint():
+    """Old releases are served by the OpenAPI, which needs a token."""
+    old = LamostClass(data_release='dr8', sub_version='v2.0')
+    assert old._use_legacy
+    if old.token:
+        result = old.query_region(COORD, 0.05)
+        assert isinstance(result, Table) and len(result) > 0
+    else:
+        with pytest.raises(LoginError, match='token'):
+            old.query_region(COORD, 0.05)

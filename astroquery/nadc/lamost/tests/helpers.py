@@ -7,8 +7,42 @@ from unittest.mock import Mock
 from astropy.io import fits
 from requests import Request, Response
 
+from ..core_predr10 import LamostPreDR10Class
+
+
+# Module-level instance used by the pre-DR10 tests.
+Lamost = LamostPreDR10Class()
 
 DATA = Path(__file__).parent / 'data'
+
+LAMOST_TOKEN_ENV_VARS = (
+    "ASTROQUERY_LAMOST_TOKEN",
+    "ASTROQUERY_NADC_LAMOST_TOKEN",
+    "NADC_LAMOST_TOKEN",
+    "CHINAVO_LAMOST_TOKEN",
+    "ASTROQUERY_LAMOST_ACCESS_TOKEN",
+    "ASTROQUERY_NADC_LAMOST_ACCESS_TOKEN",
+    "NADC_LAMOST_ACCESS_TOKEN",
+    "CHINAVO_LAMOST_ACCESS_TOKEN",
+)
+
+
+def _home_env_values(path):
+    path = Path(path)
+    return {
+        'HOME': str(path),
+        'USERPROFILE': str(path),
+        'HOMEDRIVE': path.drive,
+        'HOMEPATH': str(path)[len(path.drive):] if path.drive else str(path),
+    }
+
+
+def set_mock_home(monkeypatch, path):
+    """
+    Set all common home-directory environment variables to a temporary path.
+    """
+    for name, value in _home_env_values(path).items():
+        monkeypatch.setenv(name, value)
 
 
 def create_mock_response(content=None, status_code=200, content_type='text/plain',

@@ -29,7 +29,8 @@ nadc.lamost
 
 - New module to access the LAMOST spectroscopic survey archive hosted by the
   National Astronomical Data Center (NADC), using its TAP and SSAP services
-  (DR10 and later) for catalog queries. [#3666]
+  (DR10 and later) for catalog queries, with an OpenAPI-based fallback
+  (``LamostPreDR10Class``) for older releases. [#3666]
 
 nrao
 ^^^^

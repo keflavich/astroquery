@@ -14,9 +14,16 @@ with the provided parsers.
 Examples use the public DR10/v2.0 service unless another release is specified.
 Executing queries and downloading data requires internet access.
 
-The VO services exist for DR10 and later (for example ``dr10/v2.0``,
-``dr11/v1.0`` and ``dr12/v1.0``). ``get_spectra`` and ``download_catalog``
-also work for older releases.
+The VO services exist for DR10/v2.0 and later (``dr10/v2.0``, ``dr11/v1.0``,
+``v1.1``, ``v2.0`` and ``dr12/v1.0``). Older releases (DR1-DR9, DR10 v0/v1.0,
+DR11 v0) have no TAP service, so
+`~astroquery.nadc.lamost.LamostClass` transparently falls back to a separate
+implementation, `~astroquery.nadc.lamost.LamostPreDR10Class`
+(``astroquery.nadc.lamost.core_predr10``), that uses the LAMOST OpenAPI. The VO
+path is always the entry point and receives all new development; the legacy
+module only carries the code needed for old releases. The same methods and
+arguments work for both, with the limitations listed in
+`Older data releases`_.
 
 Configuration
 =============
@@ -65,11 +72,12 @@ Other query methods:
 
 ``query_catalog``
     Any table of the ``public`` schema, with optional cone, equality and
-    range ``constraints``, a raw ``where`` condition, ``columns`` and
-    ``order_by``.
+    range ``constraints``, a raw ``where`` condition, ``columns``,
+    ``sort_by``/``sort_order`` and ``page``.
 ``query_spectra``
     Quality filters: ``snr_min`` and ``teff_range``, ``logg_range`` and
-    ``feh_range`` (the latter three use the stellar-parameter table).
+    ``feh_range`` (the latter three use the stellar-parameter table), and
+    ``nearest_only=True`` to return only the closest match.
 ``query_stellar_parameters``
     ``query_spectra`` with a default set of stellar-parameter columns.
 ``get_metadata``
@@ -77,6 +85,9 @@ Other query methods:
 ``query_repeat_observations``
     All observations of a target (those sharing a ``uid``), found from an
     ``obsid`` or from a cone.
+``get_dr_versions``
+    The data releases and sub-versions known to the archive (metadata
+    dictionaries; this query uses the OpenAPI).
 ``query_ssa``
     SSAP cone search. The result has the catalogue columns and ``accref``,
     the URL of each spectrum FITS file.
@@ -88,6 +99,27 @@ Other query methods:
   >>> print(stars)  # doctest: +IGNORE_OUTPUT
   >>> repeats = lamost.query_repeat_observations(obsid=16011237)
   >>> print(repeats)  # doctest: +IGNORE_OUTPUT
+
+Pagination
+==========
+
+The TAP service returns at most ``max_rows`` rows quickly (about 1.6 ms per
+row, so a 10,000-row query takes ~15 s) and the DR10 catalogue alone has 11
+million rows, so large tables must be downloaded in chunks. Pass ``page``
+(1-based) together with a finite ``max_rows`` as the page size. Pages are
+ordered by ``obsid`` (indexed, so fast) unless ``sort_by`` is given; the ADQL
+is ``SELECT TOP n ... ORDER BY obsid OFFSET (page-1)*n``:
+
+.. doctest-remote-data::
+
+  >>> page1 = lamost.query_catalog('catalogue', columns=['obsid', 'ra', 'dec'], max_rows=100, page=1)
+  >>> page2 = lamost.query_catalog('catalogue', columns=['obsid', 'ra', 'dec'], max_rows=100, page=2)
+  >>> set(page1['obsid']).isdisjoint(page2['obsid'])
+  True
+
+Large offsets get slower; for a full-table download it is faster to walk the
+index with ``where='obsid > <last obsid from the previous chunk>'`` and
+``sort_by='obsid'`` instead of increasing ``page``.
 
 ADQL queries
 ============
@@ -155,6 +187,30 @@ Find product names on the selected release's download page;
 FITS verification checks file structure. Inspect warnings before changing
 ``verify`` and assess pixel quality separately. Catalog downloads bypass the
 response cache and do not resume partial files.
+
+Older data releases
+===================
+
+For releases without a TAP service, the query methods
+(``query_region``, ``query_catalog``, ``query_spectra``,
+``query_stellar_parameters``, ``get_metadata``,
+``query_repeat_observations``, ``get_spectra``, ``download_catalog``) are
+delegated to the OpenAPI-based `~astroquery.nadc.lamost.LamostPreDR10Class`
+(available as ``lamost.legacy``, which also offers ``query_sql`` and
+``get_tables_metadata``). Some differences:
+
+* ``query_tap``, ``query_ssa`` and ``get_tables`` raise `NotImplementedError`;
+* ``where`` (raw ADQL conditions) and ``separation`` columns are not
+  available, use ``constraints``;
+* the token is required for some releases and follows the usual precedence:
+  argument, ``conf.token``, the ``ASTROQUERY_NADC_LAMOST_TOKEN`` environment
+  variable, then the ``pylamost_config`` file.
+
+.. doctest::
+
+  >>> old = LamostClass(data_release='dr8', sub_version='v2.0', token='')
+  >>> old.query_region('160.5 -1.2', 5 * u.arcsec, get_query_payload=True)['sr'] # doctest: +IGNORE_OUTPUT
+  0.001388888888888889
 
 Reading Local Spectra
 =====================

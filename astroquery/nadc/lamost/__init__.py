@@ -47,8 +47,9 @@ class Conf(_config.ConfigNamespace):
 conf = Conf()
 
 from .core import Lamost, LamostClass
+from .core_predr10 import LamostPreDR10Class
 from .core import parse_lrs_spectrum, parse_mrs_spectrum
 
-__all__ = ['Lamost', 'LamostClass',
+__all__ = ['Lamost', 'LamostClass', 'LamostPreDR10Class',
            'Conf', 'conf',
            'parse_lrs_spectrum', 'parse_mrs_spectrum']
