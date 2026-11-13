@@ -4,7 +4,8 @@ LAMOST Spectroscopic Survey Query Tool
 ---------------------------------------
 
 This module provides access to the LAMOST (Large Sky Area Multi-Object Fiber
-Spectroscopic Telescope) spectroscopic survey data through the LAMOST OpenAPI.
+Spectroscopic Telescope) spectroscopic survey data through the IVOA services
+(TAP and SSAP) of each data release.
 """
 
 from astropy import config as _config
@@ -17,8 +18,13 @@ class Conf(_config.ConfigNamespace):
 
     server = _config.ConfigItem(
         'https://www.lamost.org/openapi',
-        'LAMOST OpenAPI base URL, including /openapi. Read when a '
-        'LamostClass instance is created.')
+        'LAMOST OpenAPI base URL, including /openapi, used for spectrum and '
+        'catalog-file downloads.')
+
+    vo_server = _config.ConfigItem(
+        'https://www.lamost.org',
+        'Base URL of the LAMOST data releases; the TAP and SSAP services are '
+        'at <vo_server>/<data_release>/<sub_version>/voservice/{tap,ssap}.')
 
     timeout = _config.ConfigItem(
         60,
@@ -26,7 +32,7 @@ class Conf(_config.ConfigNamespace):
 
     data_release = _config.ConfigItem(
         'dr10',
-        'Default LAMOST data release version (e.g., dr10, dr11, dr12)')
+        'Default LAMOST data release (e.g., dr10, dr11, dr12; the VO services exist for DR10 and later)')
 
     sub_version = _config.ConfigItem(
         'v2.0',
@@ -34,10 +40,8 @@ class Conf(_config.ConfigNamespace):
 
     token = _config.ConfigItem(
         '',
-        'Authentication token read when a LamostClass instance is created. '
-        'An empty value allows environment/config-file fallback; pass token="" '
-        'to the constructor for anonymous access. Authenticated requests '
-        'disable caching.')
+        'Token appended to download requests, for releases that require one. '
+        'TAP and SSAP queries are anonymous.')
 
 
 conf = Conf()

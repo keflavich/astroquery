@@ -4,308 +4,119 @@
 LAMOST Queries (`astroquery.nadc.lamost`)
 *****************************************
 
-``astroquery.nadc.lamost`` provides access to the LAMOST archive for catalog
-queries, metadata lookups, and LRS/MRS spectrum downloads and reading.
+``astroquery.nadc.lamost`` provides access to the LAMOST archive. Catalog
+queries use the IVOA Table Access Protocol (TAP) and Simple Spectral Access
+Protocol (SSAP) services that LAMOST publishes for each data release, through
+`pyvo <https://pyvo.readthedocs.io>`_. LRS/MRS spectra and catalog files are
+downloaded from the LAMOST OpenAPI, and local spectrum files can be read
+with the provided parsers.
 
 Examples use the public DR10/v2.0 service unless another release is specified.
-Executing queries and downloading data requires internet access; payload-only
-examples do not execute the data query.
+Executing queries and downloading data requires internet access.
 
-Examples with ``overwrite=True`` replace existing output files.
+The VO services exist for DR10 and later (for example ``dr10/v2.0``,
+``dr11/v1.0`` and ``dr12/v1.0``). ``get_spectra`` and ``download_catalog``
+also work for older releases.
 
 Configuration
 =============
 
 Set configuration options before creating a
-`~astroquery.nadc.lamost.LamostClass` instance. For example, to set the timeout
-in seconds:
+`~astroquery.nadc.lamost.LamostClass` instance, or pass the release explicitly:
 
 .. doctest::
 
-  >>> from astroquery.nadc.lamost import LamostClass, conf
-  >>> with conf.set_temp('timeout', 120):
-  ...     lamost = LamostClass(token='', data_release='dr10', sub_version='v2.0')
-  >>> lamost.TIMEOUT
-  120
+  >>> from astroquery.nadc.lamost import LamostClass
+  >>> lamost = LamostClass(data_release='dr10', sub_version='v2.0')
+  >>> lamost.tap_url
+  'https://www.lamost.org/dr10/v2.0/voservice/tap'
 
-For authenticated access, set ``ASTROQUERY_NADC_LAMOST_TOKEN`` or configure
-``conf.token`` before creating the client:
-
-.. doctest::
-
-  >>> conf.token = 'your-token'  # doctest: +SKIP
-  >>> authenticated = LamostClass()  # doctest: +SKIP
-  >>> configured = LamostClass(pylamost_config='~/pylamost.ini')  # doctest: +SKIP
-
-Pass ``token=''`` to force anonymous access. The optional ``pylamost_config``
-path expands ``~`` and is read only when explicitly supplied. See
-`~astroquery.nadc.lamost.LamostClass` for token precedence and legacy
-environment-variable support.
+TAP and SSAP queries are anonymous. For releases whose file downloads need a
+token, pass ``token=...`` or set ``conf.token``; it is appended to download
+requests only.
 
 Basic Usage
 ===========
 
-Use ``query_region`` to find observations around a position:
+Use ``query_region`` to find observations around a position. Radii accept
+angular quantities such as ``5*u.arcsec``, angle strings such as
+``'5 arcsec'``, and bare numbers in degrees:
 
 .. doctest::
 
   >>> import astropy.units as u
   >>> from astropy.coordinates import SkyCoord
-  >>> coord = SkyCoord(10.0004738, 40.9952444, unit='deg', frame='icrs')
+  >>> coord = SkyCoord(160.5, 29.1, unit='deg', frame='icrs')
+  >>> lamost.query_region(coord, 3*u.arcmin, get_query_payload=True)  # doctest: +IGNORE_OUTPUT
+  'SELECT TOP 1000 t.*, DISTANCE(...) AS separation FROM "public".catalogue AS t WHERE ...'
 
 .. doctest-remote-data::
 
-  >>> matches = lamost.query_region(coord, radius=0.2*u.deg)
-  >>> print(matches['obsid', 'ra', 'dec'][:5])  # doctest: +IGNORE_OUTPUT
+  >>> matches = lamost.query_region(coord, radius=3*u.arcmin)
+  >>> print(matches['obsid', 'ra', 'dec', 'separation'][:5])  # doctest: +IGNORE_OUTPUT
 
-Catalog query methods return `~astropy.table.Table` objects. Coordinates are
-transformed to ICRS. Radii accept angular quantities such as ``5*u.arcsec``
-and angle strings such as ``'5 arcsec'``. Bare numbers mean degrees for
-``query_region`` and ``query_repeat_observations``; they mean
-arcseconds for the structured ``query_spectra`` and
-``query_stellar_parameters`` methods. Use explicit units to avoid ambiguity.
-Invalid or non-angular radii raise ``InvalidQueryError``.
+Results are `~astropy.table.Table` objects sorted by distance, with the
+distance in degrees in the ``separation`` column. At most ``max_rows`` (default
+1000; `None` for no limit) rows are returned. Use ``resolution='medium'``
+for the medium-resolution (MRS) catalogue. Pass ``get_query_payload=True`` to
+any ``query_*`` method to get the ADQL query instead of running it.
 
-.. note::
+Other query methods:
 
-   ``query_region`` requests CSV by default, but some LAMOST endpoints return
-   VOTable regardless of the requested format. Some of these responses declare
-   string fields shorter than their values. The client widens affected
-   fixed-length string fields in TABLEDATA before parsing, preserving complete identifiers.
-   This workaround is needed until the service supplies correct field lengths;
-   unsupported cases that would truncate strings still raise ``TableParseError``.
-
-SQL-style queries and structured catalog requests are also available:
-
-.. doctest-remote-data::
-
-  >>> sql_results = lamost.query_sql('SELECT obsid, ra, dec FROM combined LIMIT 5')
-  >>> print(sql_results)  # doctest: +IGNORE_OUTPUT
-  >>> catalog_results = lamost.query_catalog(
-  ...     'combined', columns=['obsid', 'ra', 'dec'], max_rows=5)
-  >>> print(catalog_results)  # doctest: +IGNORE_OUTPUT
-
-For page sizes and retrieving further results, see :ref:`lamost-pagination`.
-
-Use ``get_query_payload=True`` to inspect request parameters without executing
-the data query, with credentials redacted; see
-`~astroquery.nadc.lamost.LamostClass.query_catalog` for the return format.
-
-Data Release and Metadata
-=========================
-
-Use ``get_dr_versions`` to inspect available data-release and sub-version
-combinations. The instance's ``data_release`` and ``sub_version`` select the
-archive endpoint used by query and data-product methods.
-``get_tables_metadata`` returns the available catalogs and their field
-definitions. ``get_metadata(obsid)`` returns information about one observation.
-
-Known Limitations
------------------
-
-Available endpoints and formats vary by release. Select both ``data_release``
-and ``sub_version`` when reproducing an observation.
-
-- Legacy metadata lookups may require authentication even when observation
-  metadata and FITS downloads are public, as in DR7/v2.0.
-- Where no default catalog mapping is available, use ``get_tables_metadata``
-  to select a catalog and pass ``catalog_name`` explicitly.
-- ``output_format=None`` selects JSON for modern configurations and CSV for
-  legacy ones. Some older services do not support every requested format.
-- Related-observation lookup is not supported for DR3.
-
-Results from ``query_catalog`` identify their catalog in
-``table.meta['catalog']``. Use ``cache=False`` to refresh cached metadata and
-query responses.
+``query_catalog``
+    Any table of the ``public`` schema, with optional cone, equality and
+    range ``constraints``, a raw ``where`` condition, ``columns`` and
+    ``order_by``.
+``query_spectra``
+    Quality filters: ``snr_min`` and ``teff_range``, ``logg_range`` and
+    ``feh_range`` (the latter three use the stellar-parameter table).
+``query_stellar_parameters``
+    ``query_spectra`` with a default set of stellar-parameter columns.
+``get_metadata``
+    The catalogue row(s) of one ``obsid``.
+``query_repeat_observations``
+    All observations of a target (those sharing a ``uid``), found from an
+    ``obsid`` or from a cone.
+``query_ssa``
+    SSAP cone search. The result has the catalogue columns and ``accref``,
+    the URL of each spectrum FITS file.
 
 .. doctest-remote-data::
 
-  >>> versions = lamost.get_dr_versions()
-  >>> sorted({version['dr_version'] for version in versions})  # doctest: +IGNORE_OUTPUT
-  >>> metadata = lamost.get_tables_metadata()
-  >>> "tables" in metadata
-  True
+  >>> stars = lamost.query_stellar_parameters(
+  ...     teff_range=(5000, 5100), logg_range=(4, 5), snr_min=50, max_rows=5)
+  >>> print(stars)  # doctest: +IGNORE_OUTPUT
+  >>> repeats = lamost.query_repeat_observations(obsid=16011237)
+  >>> print(repeats)  # doctest: +IGNORE_OUTPUT
 
-Column Types and Units
-======================
+ADQL queries
+============
 
-``query_region``, ``query_catalog``, and its spectral-query wrappers use catalog metadata to
-convert numeric columns and attach recognized units. For example, ``obsid``
-is an integer when declared ``long``; character identifiers such as
-``gaia_source_id`` remain strings, preserving leading zeros. Missing numeric
-values are masked. Available schema information also determines the column
-types of empty results.
-
-``get_metadata`` preserves MRS band/exposure rows. The DR10/v2.0 LRS and MRS
-schemas provide no units; check the returned units before using the values in
-calculations.
-
-``query_sql`` uses column definitions supplied with the response. Without
-them, values retain the service's types: ``teff='5770'`` can remain a string.
-For SQL aliases or expressions, use ``column_schema`` to specify result types
-and units:
+``query_tap`` sends any ADQL query and returns a `pyvo.dal.TAPResults`
+(use ``.to_table()``). Tables of the main schema are quoted as ``"public".catalogue``.
+Use ``async_job=True`` for long queries.
+``get_tables`` lists the available tables and their columns:
 
 .. doctest-remote-data::
 
-  >>> column_schema = {
-  ...     'obsid': {'datatype': 'long'},
-  ...     'temperature': {'datatype': 'double', 'unit': 'K'},
-  ...     'feh': {'datatype': 'double'},
-  ...     'gaia_source_id': {'datatype': 'char'},
-  ... }
-  >>> stars = lamost.query_sql(
-  ...     'SELECT obsid, teff AS temperature, feh, gaia_source_id '
-  ...     'FROM combined LIMIT 5', column_schema=column_schema)
-  >>> hot_stars = stars[stars['temperature'] > 5500]
-  >>> stars['temperature'].unit
-  Unit("K")
+  >>> adql = """SELECT TOP 5 obsid, ra, dec, snrg FROM "public".catalogue
+  ...           WHERE snrg > 100 AND class = 'STAR'"""
+  >>> print(lamost.query_tap(adql).to_table())  # doctest: +IGNORE_OUTPUT
+  >>> tables = lamost.get_tables()
+  >>> [column.name for column in tables['"public".stellar'].columns][:5]  # doctest: +IGNORE_OUTPUT
 
-Schema names and units must match the returned columns, including any SQL
-unit conversion. Character identifiers retain leading zeros. Missing values
-are masked; NaN and infinity are preserved, so check masks and finite values
-before analysis. See `~astroquery.nadc.lamost.LamostClass.query_sql` for the
-complete ``column_schema`` behavior.
-
-Temperature cuts use kelvin, ``logg`` cuts use the base-10 logarithm of surface
-gravity in cm/s\ :sup:`2`, and ``feh`` cuts use [Fe/H] in dex. S/N thresholds
-are dimensionless. Units are attached only when declared and recognized;
-check ``table[column].unit`` before combining results from different sources.
-
-Spectral Sample Queries
-=======================
-
-Use ``query_spectra`` to select spectral catalog records with common quality
-cuts; use ``get_spectra`` to download their FITS data.
-
-Position and physical constraints are applied together in the database.
-``nearest_only=False`` returns the qualifying matches up to ``max_rows``;
-``nearest_only=True`` selects one nearest qualifying row and requires
-``page=1``. Without ``sort_by``, position results are ordered by angular
-distance, with stable secondary ordering for ties. MRS exposures sharing an
-``obsid`` remain separate rows.
-
-.. code-block:: python
-
-   matches = lamost.query_stellar_parameters(
-       coord, '0.2 deg', teff_range=(4500, 6500),
-       logg_range=(3.5, 5), feh_range=(-1, 0.5), snr_min=30,
-       max_rows=1000)
-   nearest = lamost.query_stellar_parameters(
-       coord, '0.2 deg', teff_range=(4500, 6500),
-       logg_range=(3.5, 5), feh_range=(-1, 0.5), snr_min=30,
-       nearest_only=True)
-
-For direct ``query_catalog`` batch positions, use a ``proximity`` constraint:
-
-.. code-block:: python
-
-   matches = lamost.query_catalog(
-       'combined', columns=['obsid', 'ra', 'dec'], max_rows=1000,
-       position_constraints={'proximity': {
-           'radecTextarea': '10.0004738,40.9952444,720\n10.008848,40.969976,5',
-           'proximity_nearestonly': False}})
-
-Radii in that text are arcseconds. ``inputobjs_input_line`` preserves the
-original one-based text line number (including skipped comments/header lines),
-so repeated positions and overlapping matches remain distinguishable.
-``inputobjs_dist_arcsec`` gives the angular separation in arcseconds.
-For batch nearest matching, one qualifying row is selected per input;
-an integer ``max_rows`` then limits the complete output page, not each input
-separately.
-
-On SQL-backed paths, ``contains`` uses case-insensitive ``ILIKE`` patterns:
-``%`` and ``_`` act as wildcards. Equivalence with the native structured
-endpoint's matching rules has not been verified.
-
-Use ``query_stellar_parameters`` when the
-desired output is focused on stellar atmospheric parameters.  The default
-columns are ``obsid``, ``ra``, ``dec``, ``teff``, ``logg``, ``feh``, and the
-selected SNR column for LRS. The default LRS S/N field is ``snrg``; callers can
-select ``snru``, ``snrr``, ``snri``, or ``snrz`` explicitly with
-``snr_column``. MRS uses ``snr``, ``teff_lasp``, ``logg_lasp``, and
-``feh_lasp``. Early MRS configurations use the verified ``teff``,
-``logg``, and ``feh`` names instead; the public range parameters are unchanged.
-
-.. doctest::
-
-  >>> stellar_payload = lamost.query_stellar_parameters(
-  ...     teff_range=(4500, 6500),
-  ...     snr_min=30,
-  ...     get_query_payload=True,
-  ... )
-  >>> stellar_payload["json"]["showcol"]
-  ['obsid', 'ra', 'dec', 'teff', 'logg', 'feh', 'snrg']
-
-Use ``query_repeat_observations`` to resolve one observation ID, or one
-position and radius, to related observations. These two input forms are
-mutually exclusive. Its return value is a dictionary containing
-``unique_id``, ``related_obsids``, ``related_obsids_low``, and
-``related_obsids_medium``; the latter lists distinguish LRS and MRS IDs.
-An unmatched target has ``unique_id=None`` and empty lists. The convenience
-``related_obsids`` union has no resolution labels; use the separate lists to
-choose the download resolution, since the two ID spaces can overlap.
-Associations follow the selected release's target identity rules. Use an
-``obsid`` from that release when available; a cone query instead returns
-nearby observations without asserting that they belong to one target.
-
-.. code-block:: python
-
-   related = lamost.query_repeat_observations(obsid=176604010)
-   print(related['related_obsids_low'])
-
-.. doctest::
-
-  >>> repeat_payload = lamost.query_repeat_observations(
-  ...     coordinates=coord,
-  ...     radius=3*u.arcsec,
-  ...     get_query_payload=True,
-  ... )
-  >>> repeat_payload["ra"], repeat_payload["dec"]
-  (10.0004738, 40.9952444)
-
-.. _lamost-pagination:
-
-Catalog Pagination
-==================
-
-``query_catalog``, ``query_spectra``, and ``query_stellar_parameters`` return
-one page per call, with a default ``max_rows=100`` and one-based ``page``.
-This is a client default to limit data transfer, not a general 100-row limit
-of the LAMOST service. With an integer ``max_rows``, additional pages are not
-fetched automatically.
-To request another page, keep the selection, page size, and sort order fixed:
-
-.. code-block:: python
-
-   matches = lamost.query_spectra(
-       coord, '0.2 deg', columns=['obsid', 'ra', 'dec'],
-       sort_by='obsid', max_rows=100, page=2)
-
-An empty table marks the end of the results. Pages are separate requests,
-not an atomic snapshot of a changing catalog. Errors propagate instead of
-being treated as an empty final page.
-
-Set ``max_rows='all'`` with ``page=1`` (the default) to request all matching
-rows in one response, without a client row limit:
-
-.. code-block:: python
-
-   matches = lamost.query_spectra(
-       coord, '0.2 deg', columns=['obsid', 'ra', 'dec'], max_rows='all')
-
-Selection criteria and ``nearest_only`` still apply. Large results may
-exceed service timeouts or available memory.
+The underlying `pyvo.dal.TAPService` and `pyvo.dal.SSAService` are available
+as ``lamost.tap`` and ``lamost.ssa``.
 
 Data Products
 =============
 
 Use ``resolution='low'`` for LRS or ``resolution='medium'`` for MRS.
-``get_metadata`` returns an observation table; ``get_spectra`` accepts one
+``get_spectra`` accepts one
 observation ID and returns a list of `~astropy.io.fits.HDUList` objects.
 The FITS retains its headers, inverse variance, masks, and spectral extensions.
 To obtain its download URL without fetching the file, use ``get_spectrum_list``.
-Authenticated URLs contain the token and must not be shared or logged;
-``get_query_payload=True`` returns redacted parameters instead.
+Authenticated URLs contain the token and must not be shared or logged.
 
 ``get_spectra`` uses Astropy's ``verify='warn'`` by default. This example
 uses ``silentfix`` to repair structural FITS header issues in the selected
@@ -337,8 +148,7 @@ path. For example:
    path = lamost.download_catalog('dr10_v2.0_LRS_plan.fits.gz')
 
 Find product names on the selected release's download page;
-``get_tables_metadata`` lists queryable tables instead. DR3 supports the
-``'plan'`` product, a gzip CSV. FITS catalog downloads use
+``get_tables`` lists queryable tables instead. FITS catalog downloads use
 ``verify='exception'`` by default. Existing files are reused unless
 ``overwrite=True``; failed downloads leave an existing file intact.
 
@@ -391,17 +201,14 @@ Failures and Diagnostics
 ========================
 
 ``InvalidQueryError``
-    Check parameter values and catalog column names using
-    ``get_tables_metadata``.
-``LoginError``
-    Check the token and its access permissions, then create a new client.
-``requests.HTTPError`` or ``RemoteServiceError``
-    Check service availability and the selected release. A missing endpoint
-    does not necessarily mean authentication is required.
-``TableParseError``
-    The response could not be read safely. Inspect ``lamost.response``, which
-    retains a diagnostic copy with credentials redacted. Include the selected
-    release and query parameters when reporting the problem.
+    Check parameter values and column names using ``get_tables``.
+`pyvo.dal.DALQueryError`, `pyvo.dal.DALServiceError`
+    The TAP or SSAP service rejected the query or could not be reached, for
+    example for a release without VO services. The message includes the
+    service's explanation, such as an unknown column.
+`requests.HTTPError`
+    A spectrum or catalog-file download failed. Check service availability and
+    the selected release.
 
 Reference/API
 =============
