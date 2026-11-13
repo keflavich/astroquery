@@ -166,21 +166,6 @@ are masked; NaN and infinity are preserved, so check masks and finite values
 before analysis. See `~astroquery.nadc.lamost.LamostClass.query_sql` for the
 complete ``column_schema`` behavior.
 
-To inspect or save SQL output before table parsing, use ``query_sql_async``:
-
-.. code-block:: python
-
-   from pathlib import Path
-
-   with lamost.query_sql_async(
-       'SELECT obsid, ra, dec FROM combined LIMIT 5', output_format='csv') as response:
-       Path('lamost-response.csv').write_bytes(response.content)
-
-This follows astroquery's ``_async`` convention: it returns a
-``requests.Response`` from a synchronous request, leaving table parsing to
-the caller. Raw responses may contain credentials; use the redacted diagnostic
-response described below when reporting an error.
-
 Temperature cuts use kelvin, ``logg`` cuts use the base-10 logarithm of surface
 gravity in cm/s\ :sup:`2`, and ``feh`` cuts use [Fe/H] in dex. S/N thresholds
 are dimensionless. Units are attached only when declared and recognized;

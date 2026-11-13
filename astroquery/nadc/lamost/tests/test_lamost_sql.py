@@ -20,7 +20,7 @@ def test_raw_sql_response_is_not_parsed_or_redacted(patch_request):
     response = create_mock_response(content=b'<broken>raw response\x00\xff synthetic-token', content_type='text/csv')
     patch_request(response)
     client = LamostClass(token='synthetic-token')
-    raw = client.query_sql_async('SELECT 1')
+    raw = client._request_sql('SELECT 1')
     assert raw is response
     assert raw.content.endswith(b'\x00\xff synthetic-token')
     with pytest.raises(TableParseError):
@@ -33,7 +33,7 @@ def test_raw_sql_response_is_not_parsed_or_redacted(patch_request):
 ])
 def test_sql_default_format_respects_release_and_explicit_choice(release, version, expected):
     client = LamostClass(data_release=release, sub_version=version)
-    payload = client.query_sql_async('SELECT 1', get_query_payload=True)
+    payload = client._request_sql('SELECT 1', get_query_payload=True)
     assert payload['output.fmt'] == expected
     explicit = 'json' if expected == 'csv' else 'csv'
     payload = client.query_sql('SELECT 1', output_format=explicit, get_query_payload=True)

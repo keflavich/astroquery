@@ -1059,34 +1059,9 @@ class LamostClass(BaseQuery):
                                            empty_columns=list(base_schema))
         return self._prepare_catalog_result(table, catalog_name=catalog_name, columns=None)
 
-    def query_sql_async(self, sql, *, output_format=None,
-                        get_query_payload=False, cache=True):
-        """Execute SQL and return the unparsed HTTP response.
-
-        Parameters
-        ----------
-        sql : str
-            SQL accepted by the selected release.
-        output_format : {None, "json", "csv", "votable", "txt"}, optional
-            Requested wire format. None selects CSV for legacy configurations
-            and JSON for modern ones. Explicit formats are sent unchanged.
-        get_query_payload : bool, optional
-            Return redacted request parameters instead of sending the query.
-        cache : bool, optional
-            Use the astroquery cache for anonymous requests.
-
-        Returns
-        -------
-        requests.Response or dict
-            Original response, or redacted parameters. HTTP, authentication,
-            and explicit service errors are checked; table parsing is deferred.
-
-        Notes
-        -----
-        This follows astroquery's ``_async`` convention, not Python async/await.
-        To retain a response for independent parsing, save ``response.content``
-        before closing it. Raw responses may contain private data and credentials.
-        """
+    def _request_sql(self, sql, *, output_format=None,
+                     get_query_payload=False, cache=True):
+        """Execute SQL and return the unparsed HTTP response (or redacted payload)."""
         if output_format is None:
             output_format = 'csv' if self._legacy_metadata() else 'json'
         output_format = self._normalize_output_format(
@@ -1154,7 +1129,7 @@ class LamostClass(BaseQuery):
             or any(not isinstance(value, Mapping) for value in column_schema.values())
         ):
             raise InvalidQueryError("column_schema must map result column names to metadata dictionaries.")
-        response = self.query_sql_async(
+        response = self._request_sql(
             sql,
             output_format=output_format,
             get_query_payload=get_query_payload,
@@ -1319,8 +1294,8 @@ class LamostClass(BaseQuery):
             )
             result_schema = {name: schema[name] for name in (columns or schema)}
             result_schema.update(extras)
-            response = self.query_sql_async(sql, output_format=output_format,
-                                            get_query_payload=get_query_payload, cache=cache)
+            response = self._request_sql(sql, output_format=output_format,
+                                         get_query_payload=get_query_payload, cache=cache)
             if get_query_payload:
                 return response
             if not response.content.removeprefix(b'\xef\xbb\xbf').strip():
